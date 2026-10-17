@@ -1,0 +1,8 @@
+{
+  "name": "Smoke run on sample app",
+  "target_url": "http://localhost:5000",
+  "max_pages": 10,
+  "max_depth": 2,
+  "max_tests": 20,
+  "agent_mode": "mock"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "tc_9e8d7c6b5a40",
+  "run_id": "run_7f3a9c21b4d8",
+  "journey_id": "jny_1a2b3c4d5e6f",
+  "title": "Login without a password shows an error",
+  "description": "Submitting the login form with only an email must be rejected.",
+  "priority": 1,
+  "steps": [
+    {
+      "index": 1,
+      "action": "navigate",
+      "selector": null,
+      "value": null,
+      "url": "http://localhost:5000/login",
+      "description": "Open the login page"
+    },
+    {
+      "index": 2,
+      "action": "fill",
+      "selector": "#email",
+      "value": "user@example.com",
+      "url": null,
+      "description": "Type an email address and leave the password empty"
+    },
+    {
+      "index": 3,
+      "action": "click",
+      "selector": "button[type='submit']",
+      "value": null,
+      "url": null,
+      "description": "Press Sign in"
+    },
+    {
+      "index": 4,
+      "action": "assert_text",
+      "selector": "#error-message",
+      "value": "Password is required",
+      "url": null,
+      "description": "An error message must be shown"
+    }
+  ],
+  "expected_result": "The form is rejected and the message 'Password is required' is shown.",
+  "generated_by": "mock",
+  "created_at": "2026-10-17T10:00:40Z"
+}

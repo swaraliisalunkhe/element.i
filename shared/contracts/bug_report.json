@@ -1,0 +1,39 @@
+{
+  "id": "bug_c0ffee123456",
+  "run_id": "run_7f3a9c21b4d8",
+  "test_case_id": "tc_9e8d7c6b5a40",
+  "journey_id": "jny_1a2b3c4d5e6f",
+  "title": "Login accepts an empty password",
+  "severity": "high",
+  "category": "form_validation",
+  "description": "The login form lets a visitor sign in with an email only. No validation message is shown.",
+  "steps_to_reproduce": [
+    "Open http://localhost:5000/login",
+    "Type user@example.com into the Email field",
+    "Leave the Password field empty",
+    "Click Sign in"
+  ],
+  "expected_behavior": "The form is rejected and 'Password is required' is shown.",
+  "actual_behavior": "The visitor is taken to /dashboard with no error message.",
+  "page_url": "http://localhost:5000/login",
+  "confidence": 0.9,
+  "evidence": [
+    {
+      "id": "ev_5a4b3c2d1e0f",
+      "run_id": "run_7f3a9c21b4d8",
+      "test_case_id": "tc_9e8d7c6b5a40",
+      "step_index": 4,
+      "kind": "screenshot",
+      "path": "run_7f3a9c21b4d8/tc_9e8d7c6b5a40_step4.png",
+      "url": "/api/evidence/run_7f3a9c21b4d8/tc_9e8d7c6b5a40_step4.png",
+      "mime_type": "image/png",
+      "width": 1280,
+      "height": 720,
+      "size_bytes": 48213,
+      "caption": "Dashboard shown after submitting without a password",
+      "created_at": "2026-10-17T10:01:04Z"
+    }
+  ],
+  "generated_by": "mock",
+  "created_at": "2026-10-17T10:02:00Z"
+}
