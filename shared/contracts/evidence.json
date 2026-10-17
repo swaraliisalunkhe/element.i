@@ -1,0 +1,15 @@
+{
+  "id": "ev_5a4b3c2d1e0f",
+  "run_id": "run_7f3a9c21b4d8",
+  "test_case_id": "tc_9e8d7c6b5a40",
+  "step_index": 4,
+  "kind": "screenshot",
+  "path": "run_7f3a9c21b4d8/tc_9e8d7c6b5a40_step4.png",
+  "url": "/api/evidence/run_7f3a9c21b4d8/tc_9e8d7c6b5a40_step4.png",
+  "mime_type": "image/png",
+  "width": 1280,
+  "height": 720,
+  "size_bytes": 48213,
+  "caption": "Dashboard shown after submitting without a password",
+  "created_at": "2026-10-17T10:01:04Z"
+}

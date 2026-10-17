@@ -1,0 +1,21 @@
+{
+  "id": "run_7f3a9c21b4d8",
+  "name": "Smoke run on sample app",
+  "target_url": "http://localhost:5000",
+  "status": "completed",
+  "agent_mode": "mock",
+  "max_pages": 10,
+  "max_depth": 2,
+  "max_tests": 20,
+  "created_at": "2026-10-17T10:00:00Z",
+  "started_at": "2026-10-17T10:00:01Z",
+  "finished_at": "2026-10-17T10:02:30Z",
+  "error_message": null,
+  "summary": {
+    "journeys_count": 1,
+    "tests_total": 1,
+    "tests_passed": 0,
+    "tests_failed": 1,
+    "bugs_count": 1
+  }
+}

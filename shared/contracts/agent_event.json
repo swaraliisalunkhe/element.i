@@ -1,0 +1,14 @@
+{
+  "id": "evt_abcdef012345",
+  "run_id": "run_7f3a9c21b4d8",
+  "seq": 12,
+  "type": "bug_reported",
+  "agent": "reporter",
+  "level": "info",
+  "message": "Reporter filed bug: Login accepts an empty password",
+  "data": {
+    "bug_id": "bug_c0ffee123456",
+    "severity": "high"
+  },
+  "timestamp": "2026-10-17T10:02:00Z"
+}
