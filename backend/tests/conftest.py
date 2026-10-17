@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
-from app.db import Repository, init_db, make_engine, make_session_factory
+from app.core.config import get_settings
+from app.db import Repository, init_db, make_engine, make_session_factory, reset_db_caches
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "shared" / "contracts"
 
@@ -39,3 +41,36 @@ def session(engine):
 @pytest.fixture
 def repo(session):
     return Repository(session)
+
+
+@pytest.fixture
+def app_env(tmp_path, monkeypatch):
+    """Point the whole app at a temporary database and evidence folder."""
+    data = tmp_path / "data"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(data / 'api_test.db').as_posix()}")
+    monkeypatch.setenv("DATA_DIR", str(data))
+    monkeypatch.setenv("EVIDENCE_DIR", str(data / "evidence"))
+    monkeypatch.setenv("FRONTEND_ORIGIN", "http://localhost:3000")
+    get_settings.cache_clear()
+    reset_db_caches()
+    yield tmp_path
+    reset_db_caches()
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def started_runs(monkeypatch):
+    """Replaces the pipeline starter with a recorder: a list of the run ids it was called with."""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "app.api.routes.runs.start_run", lambda run_id, *a, **k: calls.append(run_id)
+    )
+    return calls
+
+
+@pytest.fixture
+def client(app_env, started_runs):
+    from app.main import create_app
+
+    with TestClient(create_app()) as test_client:
+        yield test_client
