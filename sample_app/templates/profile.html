@@ -1,0 +1,22 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile | Code Apex</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/dashboard?email={{ email }}">Dashboard</a>
+        <a href="/contact">Contact</a>
+    </nav>
+    <main>
+        <h1>My Profile</h1>
+        <p>Name: {{ user.name }}</p>
+        <p>Email: {{ email }}</p>
+        <a class="button" href="/dashboard?email={{ email }}">Back to Dashboard</a>
+    </main>
+</body>
+</html>
