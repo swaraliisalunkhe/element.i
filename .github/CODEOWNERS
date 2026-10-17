@@ -1,0 +1,30 @@
+# Fallback: if nothing below matches, Member A is the default owner.
+# In CODEOWNERS the LAST matching line wins, so keep the fallback first.
+*                              @USERNAME_A
+
+# ----- Member A -----
+/.env.example                  @USERNAME_A
+/.github/                      @USERNAME_A
+/backend/requirements.txt      @USERNAME_A
+/backend/tests/                @USERNAME_A
+/backend/app/core/             @USERNAME_A
+/backend/app/schemas/          @USERNAME_A
+/backend/app/db/               @USERNAME_A
+/backend/app/api/              @USERNAME_A
+/backend/app/orchestrator.py   @USERNAME_A
+/backend/app/main.py           @USERNAME_A
+/shared/contracts/             @USERNAME_A
+/data/                         @USERNAME_A
+
+# ----- Member B -----
+/sample_app/                   @USERNAME_B
+
+# ----- Member C -----
+/backend/app/agents/           @USERNAME_C
+/backend/app/services/         @USERNAME_C
+
+# ----- Member D -----
+/frontend/                     @USERNAME_D
+/benchmark/                    @USERNAME_D
+/docs/                         @USERNAME_D
+/README.md                     @USERNAME_D
