@@ -19,3 +19,6 @@ httpx>=0.27,<1.0
 
 # --- Browser automation (Member C uses this) ---
 playwright>=1.44,<2.0
+
+# --- LLM integration (Member C uses this) ---
+google-genai>=2.0,<3.0
