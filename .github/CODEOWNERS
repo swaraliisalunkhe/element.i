@@ -1,30 +1,30 @@
 # Fallback: if nothing below matches, Member A is the default owner.
 # In CODEOWNERS the LAST matching line wins, so keep the fallback first.
-*                              @USERNAME_A
+*                              @keshavi1251070390-wq
 
 # ----- Member A -----
-/.env.example                  @USERNAME_A
-/.github/                      @USERNAME_A
-/backend/requirements.txt      @USERNAME_A
-/backend/tests/                @USERNAME_A
-/backend/app/core/             @USERNAME_A
-/backend/app/schemas/          @USERNAME_A
-/backend/app/db/               @USERNAME_A
-/backend/app/api/              @USERNAME_A
-/backend/app/orchestrator.py   @USERNAME_A
-/backend/app/main.py           @USERNAME_A
-/shared/contracts/             @USERNAME_A
-/data/                         @USERNAME_A
+/.env.example                  @keshavi1251070390-wq
+/.github/                      @keshavi1251070390-wq
+/backend/requirements.txt      @keshavi1251070390-wq
+/backend/tests/                @keshavi1251070390-wq
+/backend/app/core/             @keshavi1251070390-wq
+/backend/app/schemas/          @keshavi1251070390-wq
+/backend/app/db/               @keshavi1251070390-wq
+/backend/app/api/              @keshavi1251070390-wq
+/backend/app/orchestrator.py   @keshavi1251070390-wq
+/backend/app/main.py           @keshavi1251070390-wq
+/shared/contracts/             @keshavi1251070390-wq
+/data/                         @keshavi1251070390-wq
 
 # ----- Member B -----
-/sample_app/                   @USERNAME_B
+/sample_app/                   @sparshikawagdarkar
 
 # ----- Member C -----
-/backend/app/agents/           @USERNAME_C
-/backend/app/services/         @USERNAME_C
+/backend/app/agents/           @swaraliisalunkhe
+/backend/app/services/         @swaraliisalunkhe
 
 # ----- Member D -----
-/frontend/                     @USERNAME_D
-/benchmark/                    @USERNAME_D
-/docs/                         @USERNAME_D
-/README.md                     @USERNAME_D
+/frontend/                     @tanishkabais13
+/benchmark/                    @tanishkabais13
+/docs/                         @tanishkabais13
+/README.md                     @tanishkabais13
