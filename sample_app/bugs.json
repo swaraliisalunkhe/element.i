@@ -1,4 +1,3 @@
-
 [
   {
     "id": "BUG-001",
@@ -63,5 +62,66 @@
     ],
     "expected": "A secure password reset flow should allow the user to change their password.",
     "actual": "The endpoint only returns a response message."
+  },
+  {
+    "id": "BUG-005",
+    "title": "Duplicate Email Registration",
+    "page": "/signup",
+    "type": "validation",
+    "severity": "high",
+    "description": "The signup endpoint accepts an email address that has already been registered, overwriting the existing user's stored information.",
+    "steps_to_reproduce": [
+      "Register an email address with a password",
+      "Register the same email address again with a different password",
+      "Observe whether the second registration succeeds"
+    ],
+    "expected": "The app should reject duplicate email registrations.",
+    "actual": "The second registration succeeds and overwrites the stored password for that email."
+  },
+  {
+    "id": "BUG-006",
+    "title": "Login Accepts Incorrect Password",
+    "page": "/login",
+    "type": "authentication",
+    "severity": "high",
+    "description": "The login endpoint allows a registered user to log in without validating the submitted password.",
+    "steps_to_reproduce": [
+      "Register a new email address",
+      "Open the login page",
+      "Enter the registered email with an incorrect password",
+      "Submit the login form"
+    ],
+    "expected": "Login should fail when the password is incorrect.",
+    "actual": "Login succeeds and redirects to the dashboard."
+  },
+  {
+    "id": "BUG-007",
+    "title": "Profile Displays Incorrect User Name",
+    "page": "/profile",
+    "type": "data_integrity",
+    "severity": "medium",
+    "description": "The profile page displays an incorrect name instead of the registered user's actual name.",
+    "steps_to_reproduce": [
+      "Register a new user",
+      "Open the profile page using that user's email",
+      "Observe the displayed profile name"
+    ],
+    "expected": "The profile should display the registered user's actual name.",
+    "actual": "The profile displays the hardcoded name Wrong User."
+  },
+  {
+    "id": "BUG-008",
+    "title": "Overview Navigation Link Leads to a Missing Page",
+    "page": "/dashboard",
+    "type": "navigation",
+    "severity": "low",
+    "description": "The Overview navigation link points to a nonexistent route instead of the home page.",
+    "steps_to_reproduce": [
+      "Open the dashboard.",
+      "Click the Overview navigation link.",
+      "Observe the resulting page."
+    ],
+    "expected": "The Overview link should navigate to the home page at /.",
+    "actual": "The link navigates to /overview-broken and returns a 404 Not Found response."
   }
 ]

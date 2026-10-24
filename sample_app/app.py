@@ -44,19 +44,20 @@ async def signup(
 ):
     email = email.strip().lower()
 
-    if email in users:
-        return HTMLResponse("Email already registered", status_code=400)
+    # Intentional QA bug BUG-005:
+    # Duplicate email registration is allowed.
 
     if password != confirm_password:
         return HTMLResponse("Passwords do not match", status_code=400)
 
-    # Intentional QA bug: weak passwords are accepted.
+    # Existing BUG-001: Weak passwords are accepted.
     users[email] = {
         "password": password,
         "name": email.split("@")[0]
     }
 
     return RedirectResponse("/login", status_code=303)
+
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -74,14 +75,19 @@ async def login(
     email = email.strip().lower()
     user = users.get(email)
 
-    if not user or user["password"] != password:
+    if not user:
         return HTMLResponse(
             "Invalid email or password", status_code=401
         )
 
+    # Intentional QA bug BUG-006:
+    # Incorrect passwords are accepted for registered emails.
+    # The password is not verified.
+
     return RedirectResponse(
         f"/dashboard?email={email}", status_code=303
     )
+
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -160,10 +166,15 @@ async def profile_page(request: Request, email: str):
     if not user:
         return RedirectResponse("/login", status_code=303)
 
+    # Intentional QA bug BUG-007:
+    # Display an incorrect name on the profile page.
+    incorrect_user = user.copy()
+    incorrect_user["name"] = "Wrong User"
+
     return templates.TemplateResponse(
         request=request,
         name="profile.html",
-        context={"user": user, "email": email}
+        context={"user": incorrect_user, "email": email}
     )
 
 
