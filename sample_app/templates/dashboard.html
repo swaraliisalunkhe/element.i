@@ -1,137 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Code Apex</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
+{% block title %}Dashboard | Code Apex{% endblock %}
 
-<body class="dashboard-page">
+{% block content %}
+<div class="dashboard-header">
+    <div class="dashboard-title-group">
+        <h1 id="dashboard-title">Assessment Dashboard</h1>
+        <p>Monitor candidate evaluations, active assessment tracks, and technical qualification metrics.</p>
+    </div>
 
-    <nav class="dashboard-nav">
-        <a href="/" class="brand">
-            <span class="brand-icon">C</span>
-            <span>Code<span class="brand-accent">Apex</span></span>
+    <div>
+        <a href="/assessments?email={{ user.email | urlencode }}" class="btn btn-primary btn-sm" id="btn-new-assessment">
+            Browse All Assessments →
         </a>
+    </div>
+</div>
 
-        <div class="nav-links">
-            <a href="/overview-broken" class="nav-link active">Overview</a>
-            <a href="/contact" class="nav-link">Support</a>
-            <a href="/profile?email={{ email }}" class="nav-link">Profile</a>
-            <a href="/login" class="logout-link">Log out ↗</a>
+<div class="stats-grid">
+    <div class="stat-card">
+        <span class="stat-label">Active Tracks</span>
+        <span class="stat-value" id="stat-active-tests">{{ assessments|length }}</span>
+        <span class="stat-trend">2 Standardized Tracks</span>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Submissions Evaluated</span>
+        <span class="stat-value" id="stat-submissions-count">{{ submissions|length }}</span>
+        <span class="stat-trend">Active Session</span>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Benchmark Average</span>
+        <span class="stat-value" id="stat-avg-score">76.4%</span>
+        <span class="stat-trend">+4.2% Above Baseline</span>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-label">Qualification Rate</span>
+        <span class="stat-value" id="stat-pass-rate">68%</span>
+        <span class="stat-trend">Standard Criteria</span>
+    </div>
+</div>
+
+<div class="section-heading">
+    <h2>Preloaded Technical Assessments</h2>
+    <span class="assessment-badge orange">ACTIVE BENCHMARKS</span>
+</div>
+
+<div class="assessments-grid">
+    {% for key, test in assessments.items() %}
+    <div class="assessment-card" id="card-{{ test.id }}">
+        <div>
+            <div class="assessment-top">
+                <span class="assessment-badge orange">{{ test.type }}</span>
+                <span style="font-size: 13px; font-weight: 600; color: #6b7280;">{{ test.duration_minutes }} Mins</span>
+            </div>
+
+            <h3 class="assessment-title">{{ test.title }}</h3>
+            <div class="assessment-role">Target Role: {{ test.role }}</div>
+            <p class="assessment-desc">{{ test.description }}</p>
+
+            <div class="assessment-meta">
+                <span class="meta-item">📝 {{ test.mcq_questions|length }} MCQs ({{ test.mcq_total_marks }} pts)</span>
+                <span class="meta-item">💻 1 Coding Problem ({{ test.coding_total_marks }} pts)</span>
+                <span class="meta-item">🎯 Pass: {{ test.passing_percentage }}%</span>
+            </div>
         </div>
-    </nav>
 
-    <main class="dashboard-container">
-
-        <section class="welcome-section">
-            <div>
-                <p class="eyebrow">
-                    <span class="status-dot"></span>
-                    PERSONAL WORKSPACE
-                </p>
-
-                <h1>Welcome back,<br>
-                    <span>{{ user.name }}</span>
-                </h1>
-
-                <p class="welcome-description">
-                    Your space is ready. Here's your account overview.
-                </p>
-            </div>
-
-            <div class="welcome-decoration">
-                <div class="orbit orbit-one"></div>
-                <div class="orbit orbit-two"></div>
-                <div class="orbit orbit-three"></div>
-                <div class="orbit-center">CA</div>
-            </div>
-        </section>
-
-        <section class="section-heading">
-            <div>
-                <h2>Your overview</h2>
-                <p>A quick look at your account information.</p>
-            </div>
-            <span class="overview-badge">ACCOUNT SUMMARY</span>
-        </section>
-
-        <section class="dashboard-grid">
-
-            <article class="info-card account-card">
-                <div class="card-top">
-                    <div class="card-icon purple-icon">✳</div>
-                    <span class="card-label">ACCOUNT</span>
-                </div>
-
-                <h3>Active workspace</h3>
-                <p class="card-description">
-                    You're successfully signed in to Code Apex.
-                </p>
-
-                <div class="card-footer">
-                    <span class="mini-status"></span>
-                    Session active
-                </div>
-            </article>
-
-            <article class="info-card identity-card">
-                <div class="card-top">
-                    <div class="card-icon blue-icon">◎</div>
-                    <span class="card-label">IDENTITY</span>
-                </div>
-
-                <h3>{{ user.name }}</h3>
-                <p class="card-description">Your registered username</p>
-
-                <div class="card-footer">
-                    <span class="footer-symbol">↗</span>
-                    <a href="/profile?email={{ email }}">View profile</a>
-                </div>
-            </article>
-
-            <article class="info-card email-card">
-                <div class="card-top">
-                    <div class="card-icon green-icon">✉</div>
-                    <span class="card-label">EMAIL ADDRESS</span>
-                </div>
-
-                <h3 class="email-value">{{ email }}</h3>
-                <p class="card-description">
-                    Your account's registered email address.
-                </p>
-
-                <div class="card-footer">
-                    <span class="footer-symbol">↗</span>
-                    <a href="/contact">Get support</a>
-                </div>
-            </article>
-
-        </section>
-
-        <section class="quick-access">
-            <div class="quick-access-text">
-                <div class="quick-icon">✦</div>
-                <div>
-                    <h2>Need a hand?</h2>
-                    <p>Visit our contact page if you need help with your account.</p>
-                </div>
-            </div>
-
-            <a href="/contact" class="support-button">
-                Contact support <span>→</span>
+        <div class="assessment-actions">
+            <a href="/assessments/{{ test.id }}/mcq" class="btn btn-primary btn-sm" id="btn-take-mcq-{{ test.id }}">
+                Take MCQ Test
             </a>
-        </section>
+            <a href="/assessments/{{ test.id }}/coding" class="btn btn-secondary btn-sm" id="btn-take-code-{{ test.id }}">
+                Take Coding Test
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
 
-        <footer class="dashboard-footer">
-            <span>© Code Apex</span>
-            <span>BUILT FOR A BETTER EXPERIENCE <span class="footer-star">✦</span></span>
-        </footer>
+<div class="section-heading" style="margin-top: 48px;">
+    <h2>Candidate Evaluation Records</h2>
+    <a href="/reset" class="btn btn-secondary btn-sm">Reset Demo State</a>
+</div>
 
-    </main>
-
-</body>
-
-</html>
+<div class="card" style="padding: 0; overflow: hidden;">
+    <table class="breakdown-table" id="submissions-table">
+        <thead>
+            <tr>
+                <th>Submission ID</th>
+                <th>Candidate</th>
+                <th>Assessment Track</th>
+                <th>Total Score</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub in submissions %}
+            <tr id="row-{{ sub.id }}">
+                <td><code>{{ sub.id }}</code></td>
+                <td>
+                    <strong>{{ sub.candidate_name }}</strong><br>
+                    <span style="font-size: 12px; color: #6b7280;">{{ sub.candidate_email }}</span>
+                </td>
+                <td><strong>{{ sub.assessment_title }}</strong></td>
+                <td>
+                    <strong style="color: var(--primary-orange); font-size: 15px;">{{ sub.total_score }} / {{ sub.max_score }}</strong>
+                    <span style="font-size: 12px; color: #6b7280;">({{ sub.percentage }}%)</span>
+                </td>
+                <td>
+                    {% if sub.result_status == 'Qualified' %}
+                    <span class="status-badge qualified">Qualified</span>
+                    {% else %}
+                    <span class="status-badge review">Review Needed</span>
+                    {% endif %}
+                </td>
+                <td style="font-size: 13px; color: #6b7280;">{{ sub.submitted_at }}</td>
+                <td>
+                    <a href="/results/{{ sub.id }}" class="btn btn-secondary btn-sm" id="btn-view-{{ sub.id }}">
+                        View Report →
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,34 +1,50 @@
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Code Apex</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/signup">Sign Up</a>
-        <a href="/login">Login</a>
-        <a href="/contact">Contact</a>
-    </nav>
+{% block title %}Sign In | Code Apex{% endblock %}
 
-    <main>
-        <h1>Login</h1>
-        <form action="/login" method="post">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" required>
+{% block content %}
+<div style="max-width: 440px; margin: 40px auto;">
+    <div class="card" style="padding: 36px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="brand-icon" style="margin: 0 auto 16px auto;">CA</div>
+            <h1 style="font-size: 24px; font-weight: 800;">Sign in to Code Apex</h1>
+            <p style="font-size: 14px; color: var(--text-secondary); margin-top: 6px;">
+                Access the online skills assessment platform.
+            </p>
+        </div>
 
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" required>
+        <form action="/login" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label for="email" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Work Email</label>
+                <input id="email" 
+                       name="email" 
+                       type="email" 
+                       required 
+                       value="bob.candidate@example.com"
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
 
-            <button id="login-btn" type="submit">Login</button>
+            <div style="margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <label for="password" style="font-size: 13px; font-weight: 600;">Password</label>
+                    <a href="/reset-password" style="font-size: 13px; color: var(--primary-orange);">Forgot password?</a>
+                </div>
+                <input id="password" 
+                       name="password" 
+                       type="password" 
+                       required 
+                       value="password123"
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
+
+            <button id="login-btn" type="submit" class="btn btn-primary" style="width: 100%;">
+                Sign in →
+            </button>
         </form>
-        
-        <p><a href="/reset-password">Forgot password?</a></p>
-        <p>New here? <a href="/signup">Create an account</a></p>
-    </main>
-</body>
-</html>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-light); font-size: 13px; text-align: center; color: var(--text-secondary);">
+            New candidate? <a href="/signup" style="color: var(--primary-orange); font-weight: 600;">Create an account</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
