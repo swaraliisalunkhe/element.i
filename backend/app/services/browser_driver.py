@@ -1,22 +1,86 @@
 """Asynchronous Playwright wrapper for Code Apex agents.
 
-Owner: Member C.
 Provides browser automation utilities: starting Chromium, navigation, element
 interactions, DOM summarization, screenshot capture, console log retrieval,
-and clean resource teardown.
+network failure/HTTP error diagnostics, Playwright execution tracing,
+browser session resetting, and clean resource teardown.
 """
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+import time
 from typing import Any
+import urllib.parse
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger("code_apex.services.browser_driver")
+
+SENSITIVE_PARAM_NAMES = frozenset({
+    "token",
+    "auth",
+    "authorization",
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "key",
+    "api_key",
+    "apikey",
+    "session",
+    "session_id",
+    "sessionid",
+    "jwt",
+    "sig",
+    "signature",
+    "access_token",
+    "refresh_token",
+})
+
+
+def _sanitize_url(url: str) -> str:
+    """Strip or redact sensitive query parameters from URLs in logs and diagnostics.
+
+    Preserves standard query keys while replacing values of known sensitive
+    credentials (tokens, passwords, api keys, signatures) with '[REDACTED]'.
+    """
+    if not url or "?" not in url:
+        return url
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        if not parsed.query:
+            return url
+        pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        sanitized_pairs: list[tuple[str, str]] = []
+        for k, v in pairs:
+            k_lower = k.lower()
+            if k_lower in SENSITIVE_PARAM_NAMES or any(
+                s in k_lower for s in ("token", "secret", "password", "auth", "key")
+            ):
+                sanitized_pairs.append((k, "[REDACTED]"))
+            else:
+                sanitized_pairs.append((k, v))
+        new_query = urllib.parse.urlencode(sanitized_pairs)
+        return urllib.parse.urlunsplit(
+            (parsed.scheme, parsed.netloc, parsed.path, new_query, parsed.fragment)
+        )
+    except Exception:
+        return url.split("?", 1)[0]
+
+
+def _validate_safe_filename(name: str) -> None:
+    """Validate that a filename does not contain path traversal characters."""
+    bad = (
+        not name
+        or name in (".", "..")
+        or any(char in name for char in ("/", "\\", ":", "\x00"))
+    )
+    if bad:
+        raise ValueError(f"Unsafe filename: {name!r}")
 
 
 class BrowserDriver:
@@ -38,6 +102,10 @@ class BrowserDriver:
         self._context: BrowserContext | None = None
         self._page: Page | None = None
         self._console_logs: list[dict[str, Any]] = []
+        self._request_failures: list[dict[str, Any]] = []
+        self._http_errors: list[dict[str, Any]] = []
+        self._is_tracing: bool = False
+        self._trace_name: str | None = None
 
     @property
     def page(self) -> Page | None:
@@ -45,14 +113,29 @@ class BrowserDriver:
         return self._page
 
     @property
+    def context(self) -> BrowserContext | None:
+        """Access the underlying Playwright BrowserContext if initialized."""
+        return self._context
+
+    @property
     def evidence_dir(self) -> Path:
-        """Configured folder for storing screenshot evidence."""
+        """Configured folder for storing screenshot and trace evidence."""
         return self._evidence_dir
+
+    @property
+    def is_tracing(self) -> bool:
+        """Whether Playwright execution tracing is currently active."""
+        return self._is_tracing
 
     def _ensure_page(self) -> Page:
         if self._page is None:
             raise RuntimeError("BrowserDriver has not been started. Call start() first.")
         return self._page
+
+    def _ensure_context(self) -> BrowserContext:
+        if self._context is None:
+            raise RuntimeError("BrowserDriver has not been started. Call start() first.")
+        return self._context
 
     async def start(self, headless: bool = True) -> None:
         """Launch Chromium, configure a browser context, and create a page."""
@@ -71,7 +154,42 @@ class BrowserDriver:
                 "location": msg.location,
             })
 
+        def _on_request_failed(request: Any) -> None:
+            try:
+                failure = request.failure
+                reason = (
+                    failure
+                    if isinstance(failure, str)
+                    else (failure.get("errorText") if isinstance(failure, dict) else str(failure))
+                    if failure
+                    else "Request failed"
+                )
+                self._request_failures.append({
+                    "url": _sanitize_url(request.url),
+                    "method": request.method,
+                    "failure_reason": reason,
+                    "resource_type": getattr(request, "resource_type", None),
+                })
+            except Exception as exc:
+                logger.debug(f"Failed to record failed request: {exc}")
+
+        def _on_response(response: Any) -> None:
+            try:
+                if response.status >= 400:
+                    req = getattr(response, "request", None)
+                    method = getattr(req, "method", "GET") if req else "GET"
+                    self._http_errors.append({
+                        "url": _sanitize_url(response.url),
+                        "status": response.status,
+                        "status_text": response.status_text,
+                        "method": method,
+                    })
+            except Exception as exc:
+                logger.debug(f"Failed to record HTTP error response: {exc}")
+
         self._page.on("console", _on_console)
+        self._page.on("requestfailed", _on_request_failed)
+        self._page.on("response", _on_response)
 
     async def open(self, url: str) -> dict[str, Any]:
         """Navigate to url and return page information (url, title, status)."""
@@ -152,6 +270,7 @@ class BrowserDriver:
     async def screenshot(self, name: str, output_dir: Path | str | None = None) -> Path:
         """Save a screenshot in the evidence directory or custom output directory."""
         page = self._ensure_page()
+        _validate_safe_filename(name)
         folder = Path(output_dir) if output_dir is not None else self._evidence_dir
         folder.mkdir(parents=True, exist_ok=True)
 
@@ -160,12 +279,137 @@ class BrowserDriver:
         await page.screenshot(path=str(target_path))
         return target_path
 
+    # ---------- Diagnostic and Network Error Methods ----------
+
     def console_logs(self) -> list[dict[str, Any]]:
         """Retrieve collected browser console messages."""
         return list(self._console_logs)
 
+    def request_failures(self) -> list[dict[str, Any]]:
+        """Retrieve network request failures captured via page 'requestfailed'."""
+        return list(self._request_failures)
+
+    def http_errors(self) -> list[dict[str, Any]]:
+        """Retrieve HTTP responses with status code >= 400."""
+        return list(self._http_errors)
+
+    def get_diagnostics(self) -> dict[str, list[dict[str, Any]]]:
+        """Return all collected diagnostic information across console and network."""
+        return {
+            "console_logs": list(self._console_logs),
+            "request_failures": list(self._request_failures),
+            "http_errors": list(self._http_errors),
+        }
+
+    def clear_diagnostics(self) -> None:
+        """Clear all collected console logs and network diagnostic records."""
+        self._console_logs.clear()
+        self._request_failures.clear()
+        self._http_errors.clear()
+
+    # ---------- Playwright Tracing ----------
+
+    async def start_tracing(
+        self,
+        name: str | None = None,
+        screenshots: bool = True,
+        snapshots: bool = True,
+    ) -> None:
+        """Start Playwright execution tracing on the active browser context.
+
+        Captures screenshots and DOM snapshots for deep diagnostic replays.
+        """
+        context = self._ensure_context()
+        if self._is_tracing:
+            logger.warning("Tracing already active; stopping previous trace before restart.")
+            try:
+                await context.tracing.stop()
+            except Exception as exc:
+                logger.debug(f"Error stopping prior trace: {exc}")
+            self._is_tracing = False
+
+        await context.tracing.start(
+            name=name,
+            screenshots=screenshots,
+            snapshots=snapshots,
+        )
+        self._is_tracing = True
+        self._trace_name = name
+
+    async def stop_tracing(
+        self,
+        name: str | None = None,
+        output_dir: Path | str | None = None,
+        discard: bool = False,
+    ) -> Path | None:
+        """Stop tracing and save the resulting ZIP archive into evidence_dir.
+
+        If discard is True, the trace is closed without saving an artifact.
+        """
+        if not self._is_tracing or self._context is None:
+            return None
+
+        context = self._context
+        try:
+            if discard:
+                await context.tracing.stop(path=None)
+                return None
+
+            file_stem = name or self._trace_name or f"trace_{int(time.time() * 1000)}"
+            _validate_safe_filename(file_stem)
+            filename = file_stem if file_stem.lower().endswith(".zip") else f"{file_stem}.zip"
+
+            folder = Path(output_dir) if output_dir is not None else self._evidence_dir
+            folder.mkdir(parents=True, exist_ok=True)
+            target_path = folder / filename
+
+            await context.tracing.stop(path=str(target_path))
+            return target_path
+        finally:
+            self._is_tracing = False
+            self._trace_name = None
+
+    # ---------- Session Reset ----------
+
+    async def reset_session(self) -> None:
+        """Clear client-side browser cookies, localStorage, and sessionStorage.
+
+        Operates safely across all origins within the active browser context.
+        Note:
+            This resets client-side browser state only. It does not reset
+            server-side application database state.
+        """
+        if self._context is not None:
+            await self._context.clear_cookies()
+
+        if self._page is not None and not self._page.is_closed():
+            current_url = self._page.url
+            if current_url and not current_url.startswith("about:"):
+                try:
+                    await self._page.evaluate(
+                        """() => {
+                            try { window.localStorage && window.localStorage.clear(); } catch (e) {}
+                            try { window.sessionStorage && window.sessionStorage.clear(); } catch (e) {}
+                        }"""
+                    )
+                except Exception as exc:
+                    logger.debug(f"Could not clear web storage for page {current_url}: {exc}")
+
+    # ---------- Teardown & Lifecycle ----------
+
     async def close(self) -> None:
-        """Cleanly release all browser and Playwright resources."""
+        """Cleanly release all browser and Playwright resources in order.
+
+        Stops active tracing before closing context and browser, and is safe
+        to call multiple times or after partial startup.
+        """
+        if self._is_tracing and self._context is not None:
+            try:
+                await self._context.tracing.stop()
+            except Exception as exc:
+                logger.debug(f"Error stopping trace on close: {exc}")
+            self._is_tracing = False
+
         if self._page is not None:
             try:
                 await self._page.close()
