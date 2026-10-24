@@ -307,3 +307,220 @@ def test_reporter_multiple_failures(tmp_path: Path) -> None:
     assert len(bugs) == 3
     reported_case_ids = {b.test_case_id for b in bugs}
     assert reported_case_ids == {c.id for c in cases}
+
+
+def test_reporter_console_error_classification(tmp_path: Path) -> None:
+    """Verifies that uncaught JavaScript/console errors are categorized as CONSOLE_ERROR with HIGH severity."""
+    ctx, _ = _make_context(tmp_path)
+    reporter = ReporterAgent()
+
+    case = TestCase(
+        run_id=ctx.run.id,
+        title="Assessment SPA Runtime",
+        steps=[
+            TestStep(index=1, action=BrowserAction.NAVIGATE, url="https://example.local/exam"),
+            TestStep(index=2, action=BrowserAction.CLICK, selector="#btn-start", description="Start exam"),
+        ],
+        expected_result="Exam starts cleanly without console exceptions",
+        generated_by=GenerationMode.RULE_BASED,
+    )
+    result = TestResult(
+        run_id=ctx.run.id,
+        test_case_id=case.id,
+        status=TestStatus.FAILED,
+        error_message="Step 2 execution error: Uncaught TypeError: Cannot read properties of undefined (reading 'split') in app.bundle.js",
+        step_results=[
+            StepResult(step_index=1, action=BrowserAction.NAVIGATE, status=TestStatus.PASSED),
+            StepResult(
+                step_index=2,
+                action=BrowserAction.CLICK,
+                status=TestStatus.FAILED,
+                error_message="Uncaught TypeError: Cannot read properties of undefined in bundle.js",
+                actual="Action error: Uncaught TypeError: Cannot read properties of undefined (reading 'split')",
+            ),
+        ],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    bugs = reporter.report(ctx, journeys=[], test_cases=[case], test_results=[result])
+    assert len(bugs) == 1
+    bug = bugs[0]
+    assert isinstance(bug, BugReport)
+    assert bug.category == BugCategory.CONSOLE_ERROR
+    assert bug.severity == Severity.HIGH
+    assert "console error" in bug.title.lower() or "javascript" in bug.title.lower()
+    assert "console error" in bug.description.lower() or "javascript" in bug.description.lower()
+    assert len(bug.steps_to_reproduce) == 2
+
+
+def test_reporter_assessment_timer_high_severity(tmp_path: Path) -> None:
+    """Verifies that countdown timer failures in assessments are classified with HIGH severity."""
+    ctx, _ = _make_context(tmp_path)
+    reporter = ReporterAgent()
+
+    case = TestCase(
+        run_id=ctx.run.id,
+        title="Assessment: Verify Exam Countdown Timer",
+        steps=[
+            TestStep(index=1, action=BrowserAction.NAVIGATE, url="https://example.local/exam"),
+            TestStep(index=2, action=BrowserAction.ASSERT_TEXT, selector="#exam-timer", value="00:14", description="Assert timer countdown ticking"),
+        ],
+        expected_result="Timer updates and counts down accurately",
+        generated_by=GenerationMode.RULE_BASED,
+    )
+    result = TestResult(
+        run_id=ctx.run.id,
+        test_case_id=case.id,
+        status=TestStatus.FAILED,
+        error_message="Assertion failed: expected timer countdown '00:14' but found '00:15' frozen",
+        step_results=[
+            StepResult(step_index=1, action=BrowserAction.NAVIGATE, status=TestStatus.PASSED),
+            StepResult(
+                step_index=2,
+                action=BrowserAction.ASSERT_TEXT,
+                status=TestStatus.FAILED,
+                error_message="Timer did not tick down within 1000ms",
+                actual="Assertion failed: observed '00:15' instead of expected '00:14'",
+            ),
+        ],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    bugs = reporter.report(ctx, journeys=[], test_cases=[case], test_results=[result])
+    assert len(bugs) == 1
+    bug = bugs[0]
+    assert isinstance(bug, BugReport)
+    assert bug.category == BugCategory.FUNCTIONAL
+    assert bug.severity == Severity.HIGH
+    assert "timer" in bug.title.lower()
+    assert "timer" in bug.description.lower()
+
+
+def test_reporter_assessment_code_editor_high_severity(tmp_path: Path) -> None:
+    """Verifies that code editor interaction failures in programming assessments yield HIGH severity."""
+    ctx, _ = _make_context(tmp_path)
+    reporter = ReporterAgent()
+
+    case = TestCase(
+        run_id=ctx.run.id,
+        title="Assessment: Code Editor Interaction",
+        steps=[
+            TestStep(index=1, action=BrowserAction.NAVIGATE, url="https://example.local/coding"),
+            TestStep(index=2, action=BrowserAction.CLICK, selector=".monaco-editor", description="Focus code editor"),
+            TestStep(index=3, action=BrowserAction.FILL, selector=".monaco-editor textarea", value="def solve(): pass", description="Type code solution"),
+        ],
+        expected_result="Candidate can type and edit solution in editor",
+        generated_by=GenerationMode.RULE_BASED,
+    )
+    result = TestResult(
+        run_id=ctx.run.id,
+        test_case_id=case.id,
+        status=TestStatus.FAILED,
+        error_message="Step 3 execution error: Target '.monaco-editor textarea' is unresponsive to typing",
+        step_results=[
+            StepResult(step_index=1, action=BrowserAction.NAVIGATE, status=TestStatus.PASSED),
+            StepResult(step_index=2, action=BrowserAction.CLICK, status=TestStatus.PASSED),
+            StepResult(
+                step_index=3,
+                action=BrowserAction.FILL,
+                status=TestStatus.FAILED,
+                error_message="Target '.monaco-editor textarea' is unresponsive to typing",
+                actual="Action error: Input not registered in code editor",
+            ),
+        ],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    bugs = reporter.report(ctx, journeys=[], test_cases=[case], test_results=[result])
+    assert len(bugs) == 1
+    bug = bugs[0]
+    assert isinstance(bug, BugReport)
+    assert bug.category == BugCategory.FUNCTIONAL
+    assert bug.severity == Severity.HIGH
+    assert "code editor" in bug.title.lower()
+    assert "coding challenge" in bug.description.lower() or "editor" in bug.description.lower()
+
+
+def test_reporter_assessment_mcq_option_categorization(tmp_path: Path) -> None:
+    """Verifies that MCQ option selection and radio mutual exclusivity defects are categorized as FORM_VALIDATION."""
+    ctx, _ = _make_context(tmp_path)
+    reporter = ReporterAgent()
+
+    case = TestCase(
+        run_id=ctx.run.id,
+        title="Assessment: Question 2 Option Selection",
+        steps=[
+            TestStep(index=1, action=BrowserAction.NAVIGATE, url="https://example.local/exam"),
+            TestStep(index=2, action=BrowserAction.CLICK, selector="input[name='q2'][value='B']", description="Select Option B"),
+        ],
+        expected_result="Option B radio button is checked",
+        generated_by=GenerationMode.RULE_BASED,
+    )
+    result = TestResult(
+        run_id=ctx.run.id,
+        test_case_id=case.id,
+        status=TestStatus.FAILED,
+        error_message="Radio input 'input[name=q2][value=B]' remained unselected after click",
+        step_results=[
+            StepResult(step_index=1, action=BrowserAction.NAVIGATE, status=TestStatus.PASSED),
+            StepResult(
+                step_index=2,
+                action=BrowserAction.CLICK,
+                status=TestStatus.FAILED,
+                error_message="Radio input remained unselected after click",
+                actual="Option radio state did not update to checked",
+            ),
+        ],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    bugs = reporter.report(ctx, journeys=[], test_cases=[case], test_results=[result])
+    assert len(bugs) == 1
+    bug = bugs[0]
+    assert isinstance(bug, BugReport)
+    assert bug.category == BugCategory.FORM_VALIDATION
+    assert bug.severity == Severity.MEDIUM
+    assert "option" in bug.title.lower()
+    assert "option" in bug.description.lower() or "choice" in bug.description.lower()
+
+
+def test_reporter_assessment_palette_navigation_categorization(tmp_path: Path) -> None:
+    """Verifies that question palette jumping / navigation failures are categorized as NAVIGATION."""
+    ctx, _ = _make_context(tmp_path)
+    reporter = ReporterAgent()
+
+    case = TestCase(
+        run_id=ctx.run.id,
+        title="Assessment: Question Palette Navigation",
+        steps=[
+            TestStep(index=1, action=BrowserAction.NAVIGATE, url="https://example.local/exam"),
+            TestStep(index=2, action=BrowserAction.CLICK, selector=".palette-btn[data-q='5']", description="Jump to Question 5"),
+        ],
+        expected_result="Active view switches to Question 5",
+        generated_by=GenerationMode.RULE_BASED,
+    )
+    result = TestResult(
+        run_id=ctx.run.id,
+        test_case_id=case.id,
+        status=TestStatus.FAILED,
+        error_message="Clicking palette button for Question 5 failed to switch active question",
+        step_results=[
+            StepResult(step_index=1, action=BrowserAction.NAVIGATE, status=TestStatus.PASSED),
+            StepResult(
+                step_index=2,
+                action=BrowserAction.CLICK,
+                status=TestStatus.FAILED,
+                error_message="Palette navigation failed",
+                actual="Active question remained Question 1",
+            ),
+        ],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    bugs = reporter.report(ctx, journeys=[], test_cases=[case], test_results=[result])
+    assert len(bugs) == 1
+    bug = bugs[0]
+    assert isinstance(bug, BugReport)
+    assert bug.category == BugCategory.NAVIGATION
+    assert "palette" in bug.title.lower()
+    assert "palette" in bug.description.lower()

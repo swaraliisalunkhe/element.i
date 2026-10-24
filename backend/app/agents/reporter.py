@@ -83,14 +83,17 @@ class ReporterAgent:
                 else result.error_message or "Step failed during test execution."
             )
 
+            # Determine assessment component if present
+            component = self._detect_assessment_component(case, f"{err_msg} {actual_behavior}")
+
             # Determine category, severity, and confidence via deterministic heuristics
             category, severity, confidence = self._classify_defect(
-                case, failed_action, err_msg
+                case, failed_action, err_msg, actual_behavior, component
             )
 
             # Construct concise, grounded title and description
-            title = self._build_title(case, failed_step_res, result.test_case_id)
-            description = self._build_description(case, failed_step_res, err_msg, actual_behavior)
+            title = self._build_title(case, failed_step_res, result.test_case_id, category, component)
+            description = self._build_description(case, failed_step_res, err_msg, actual_behavior, component, category)
 
             bug = BugReport(
                 run_id=ctx.run.id,
@@ -177,34 +180,91 @@ class ReporterAgent:
 
         return repro_steps or [f"Execute test case '{test_case_id}'"]
 
+    def _detect_assessment_component(
+        self,
+        case: TestCase | None,
+        combined_text: str,
+    ) -> str | None:
+        """Identify assessment component context if supported by test case or failure evidence."""
+        case_text = f"{case.title if case else ''} {case.description or '' if case else ''}".lower()
+        full_text = f"{case_text} {combined_text}".lower()
+
+        # 1. Exam Timer / Countdown
+        if any(term in full_text for term in ("timer", "countdown", "time remaining", "exam clock")):
+            return "timer"
+
+        # 2. Code Editor
+        if any(term in full_text for term in ("code editor", "monaco", "coding challenge", "run code", "code input", "code-editor")) or (
+            "editor" in case_text and any(term in full_text for term in ("code", "syntax", "language", "run"))
+        ):
+            return "code_editor"
+
+        # 3. Question Palette
+        if any(term in full_text for term in ("palette", "question grid", "question list button")):
+            return "palette"
+
+        # 4. MCQ Option
+        if any(term in full_text for term in ("mcq", "option", "radio", "choice", "single-choice", "multiple-choice")):
+            return "mcq_option"
+
+        return None
+
     def _classify_defect(
         self,
         case: TestCase | None,
         failed_action: BrowserAction | None,
         error_message: str,
+        actual_behavior: str = "",
+        component: str | None = None,
     ) -> tuple[BugCategory, Severity, float]:
         """Classify defect category, severity, and confidence based on action and error heuristics."""
-        err_lower = error_message.lower()
+        combined_err = f"{error_message} {actual_behavior}".lower()
+        case_text = f"{case.title if case else ''} {case.description or '' if case else ''}".lower()
 
-        # 1. Network / Connection / Server Errors
-        if any(term in err_lower for term in ("network", "connection", "500", "502", "503", "504", "refused", "timeout")):
+        # 1. JavaScript Console Errors & Uncaught Script Exceptions
+        is_console_error = (
+            any(term in combined_err for term in (
+                "console error", "uncaught error", "uncaught typeerror", "uncaught referenceerror",
+                "uncaught syntaxerror", "javascript error", "typeerror:", "referenceerror:",
+                "syntaxerror:", "unhandledrejection", "unhandled promise", "js exception",
+            ))
+            or ("console" in combined_err and any(w in combined_err for w in ("error", "exception", "failed", "warn")))
+        )
+        if is_console_error:
+            return BugCategory.CONSOLE_ERROR, Severity.HIGH, 0.95
+
+        # 2. Network / Connection / Server Errors
+        if any(term in combined_err for term in ("network", "connection", "500", "502", "503", "504", "refused", "timeout", "econnrefused")):
             return BugCategory.NETWORK_ERROR, Severity.HIGH, 0.9
 
-        # 2. Navigation / Route Failures
-        if failed_action in (BrowserAction.NAVIGATE, BrowserAction.ASSERT_URL) or "404" in err_lower or "navigate" in err_lower:
+        # 3. Question Palette / Route Failures -> NAVIGATION
+        if component == "palette" or any(term in case_text or term in combined_err for term in ("palette", "question grid")):
+            sev = Severity.HIGH if any(t in combined_err for t in ("not found", "failed", "error", "route")) else Severity.MEDIUM
+            return BugCategory.NAVIGATION, sev, 0.9
+
+        if failed_action in (BrowserAction.NAVIGATE, BrowserAction.ASSERT_URL) or "404" in combined_err or "navigate" in combined_err:
             return BugCategory.NAVIGATION, Severity.HIGH, 0.9
 
-        # 3. Form Validation / Input Errors
-        is_form_case = bool(case and any(term in (case.title or "").lower() for term in ("form", "login", "signup", "submit")))
+        # 4. Exam Timer / Countdown Failure -> FUNCTIONAL, HIGH
+        if component == "timer" or any(term in case_text or term in combined_err for term in ("timer", "countdown", "time remaining", "exam clock")):
+            return BugCategory.FUNCTIONAL, Severity.HIGH, 0.9
+
+        # 5. Code Editor Failure -> FUNCTIONAL, HIGH
+        if component == "code_editor" or any(term in case_text or term in combined_err for term in ("code editor", "monaco", "coding challenge", "run code", "code input")):
+            return BugCategory.FUNCTIONAL, Severity.HIGH, 0.9
+
+        # 6. MCQ Option & Form Validation Errors
+        is_mcq_option = component == "mcq_option" or any(term in case_text or term in combined_err for term in ("mcq", "option", "radio", "choice", "single-choice", "multiple-choice"))
+        is_form_case = bool(case and any(term in case_text for term in ("form", "login", "signup", "submit")))
         is_form_action = failed_action in (BrowserAction.FILL, BrowserAction.SELECT, BrowserAction.CHECK, BrowserAction.UNCHECK)
-        if is_form_action or is_form_case or any(term in err_lower for term in ("validation", "invalid", "required")):
+        if is_mcq_option or is_form_action or is_form_case or any(term in combined_err for term in ("validation", "invalid", "required")):
             return BugCategory.FORM_VALIDATION, Severity.MEDIUM, 0.85
 
-        # 4. Functional UI / Assertion Mismatch
+        # 7. Functional UI / Assertion Mismatch
         if failed_action in (BrowserAction.ASSERT_TEXT, BrowserAction.ASSERT_VISIBLE, BrowserAction.CLICK):
             return BugCategory.FUNCTIONAL, Severity.MEDIUM, 0.85
 
-        # 5. Conservative Fallback
+        # 8. Conservative Fallback
         return BugCategory.FUNCTIONAL, Severity.LOW, 0.7
 
     def _build_title(
@@ -212,12 +272,32 @@ class ReporterAgent:
         case: TestCase | None,
         failed_step_res: StepResult | None,
         test_case_id: str,
+        category: BugCategory | None = None,
+        component: str | None = None,
     ) -> str:
         """Create a concise, grounded bug title of at least 5 characters."""
         if case and failed_step_res:
-            title = f"{case.title}: step {failed_step_res.step_index} failed ({failed_step_res.action.value})"
+            action_str = failed_step_res.action.value
+            step_idx = failed_step_res.step_index
+            if component == "timer":
+                title = f"{case.title}: step {step_idx} failed ({action_str}) - timer display or countdown mismatch"
+            elif component == "code_editor":
+                title = f"{case.title}: step {step_idx} failed ({action_str}) - code editor interaction failed"
+            elif component == "mcq_option":
+                title = f"{case.title}: step {step_idx} failed ({action_str}) - option selection failed"
+            elif component == "palette":
+                title = f"{case.title}: step {step_idx} failed ({action_str}) - question palette navigation failed"
+            elif category == BugCategory.CONSOLE_ERROR:
+                title = f"{case.title}: step {step_idx} failed ({action_str}) - JavaScript console error"
+            else:
+                title = f"{case.title}: step {step_idx} failed ({action_str})"
         elif case:
-            title = f"Test failure in '{case.title}'"
+            if category == BugCategory.CONSOLE_ERROR:
+                title = f"JavaScript console error in '{case.title}'"
+            elif component:
+                title = f"Failure in assessment {component} during '{case.title}'"
+            else:
+                title = f"Test failure in '{case.title}'"
         else:
             title = f"Test case {test_case_id} failed during execution"
 
@@ -232,6 +312,8 @@ class ReporterAgent:
         failed_step_res: StepResult | None,
         err_msg: str,
         actual_behavior: str,
+        component: str | None = None,
+        category: BugCategory | None = None,
     ) -> str:
         """Create a truthful description based strictly on recorded outcomes."""
         parts: list[str] = []
@@ -248,5 +330,17 @@ class ReporterAgent:
 
         if actual_behavior and actual_behavior != err_msg:
             parts.append(f"Observed outcome: {actual_behavior.strip()}.")
+
+        # Grounded assessment impact notes (strictly without assuming backend scoring or persistence bugs)
+        if component == "timer":
+            parts.append("Assessment impact: The exam countdown or timer element is inaccurate or non-functional, hindering test-taker time awareness.")
+        elif component == "code_editor":
+            parts.append("Assessment impact: The coding challenge editor failed to accept input or execute as expected, impeding coding challenge completion.")
+        elif component == "mcq_option":
+            parts.append("Assessment impact: Multiple-choice question option selection or mutual exclusivity did not behave as expected.")
+        elif component == "palette":
+            parts.append("Assessment impact: Question palette controls failed to transition or reflect question navigation cleanly.")
+        elif category == BugCategory.CONSOLE_ERROR:
+            parts.append("Assessment impact: An uncaught client-side JavaScript or console error occurred during test execution.")
 
         return " ".join(parts)
