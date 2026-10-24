@@ -13,11 +13,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.agent_interface import AgentContext, AgentSet
 from app.core.config import Settings, get_settings
-from app.core.constants import AgentMode, AgentName, EventLevel, EventType, RunStatus
+from app.core.constants import AgentMode, AgentName, EventLevel, EventType, RunMode, RunStatus
 from app.core.errors import AppError
 from app.core.mock_agents import build_mock_agents
 from app.db import Repository, get_session_factory, session_scope
-from app.schemas import AgentEvent, BugReport, Journey, RunResponse, TestCase, TestResult
+from app.schemas import (
+    AgentEvent,
+    AssessmentMap,
+    BugReport,
+    Journey,
+    RunResponse,
+    TestCase,
+    TestResult,
+    TestSuite,
+)
 
 logger = logging.getLogger("code_apex")
 
@@ -103,6 +112,51 @@ def _check_items(items: Any, expected_type: type, run_id: str, label: str) -> li
     return items
 
 
+def _optional_agent_call(agent: Any, method_name: str, *args: Any) -> Any | None:
+    """Call an optional assessment hook without changing the generic agent contract."""
+    method = getattr(agent, method_name, None)
+    return method(*args) if callable(method) else None
+
+
+def _validate_assessment_artifact(value: Any, model: type, run_id: str, label: str) -> Any:
+    """Validate an optional assessment artifact and enforce run ownership."""
+    artifact = model.model_validate(value)
+    if artifact.run_id != run_id:
+        raise ValueError(
+            f"{label} returned run_id '{artifact.run_id}', but this run is '{run_id}'."
+        )
+    return artifact
+
+
+def _unique_by_id(items: list, label: str) -> list:
+    """Keep the first item for each id so assessment retries do not insert duplicates."""
+    unique: list = []
+    seen: set[str] = set()
+    for item in items:
+        if item.id in seen:
+            logger.warning("Ignoring duplicate %s '%s' from agent output.", label, item.id)
+            continue
+        seen.add(item.id)
+        unique.append(item)
+    return unique
+
+
+def _unique_results_by_case(results: list[TestResult]) -> list[TestResult]:
+    """Keep one result per test case so retries cannot violate the repository uniqueness rule."""
+    unique: list[TestResult] = []
+    seen_cases: set[str] = set()
+    for result in results:
+        if result.test_case_id in seen_cases:
+            logger.warning(
+                "Ignoring duplicate test result for test case '%s'.",
+                result.test_case_id,
+            )
+            continue
+        seen_cases.add(result.test_case_id)
+        unique.append(result)
+    return unique
+
+
 def _set_status(
     factory: sessionmaker[Session], run_id: str, status: RunStatus, emit: EventEmitter
 ) -> None:
@@ -172,6 +226,26 @@ def run_pipeline(
         emit(EventType.AGENT_STARTED, current,
              f"Explorer started ({run.agent_mode.value} mode).", data={"agent_mode": run.agent_mode.value})
         journeys: list[Journey] = _check_items(agent_set.explorer.explore(ctx), Journey, run_id, "Explorer")
+        assessment_map: AssessmentMap | None = None
+        if run.mode == RunMode.ASSESSMENT:
+            raw_map = _optional_agent_call(agent_set.explorer, "explore_assessment", ctx)
+            if raw_map is None:
+                logger.warning(
+                    "Assessment map unavailable for run %s; Explorer has no assessment discovery hook.",
+                    run_id,
+                )
+            else:
+                assessment_map = _validate_assessment_artifact(
+                    raw_map, AssessmentMap, run_id, "Assessment Explorer"
+                )
+                with session_scope(factory) as session:
+                    Repository(session).save_assessment_map(run_id, assessment_map)
+                emit(
+                    EventType.AGENT_PROGRESS,
+                    current,
+                    "Assessment map persisted.",
+                    data={"artifact": "assessment_map", "available": True},
+                )
         with session_scope(factory) as session:
             repo = Repository(session)
             for journey in journeys:
@@ -185,9 +259,52 @@ def run_pipeline(
         current = AgentName.TESTER
         _set_status(factory, run_id, RunStatus.TESTING, emit)
         emit(EventType.AGENT_STARTED, current, "Tester started.")
-        output = agent_set.tester.run_tests(ctx, journeys)
+        suite: TestSuite | None = None
+        if run.mode == RunMode.ASSESSMENT:
+            raw_suite = _optional_agent_call(agent_set.tester, "generate_test_suite", ctx, journeys)
+            if raw_suite is None:
+                logger.warning(
+                    "Test suite unavailable for run %s; Tester has no assessment suite hook.",
+                    run_id,
+                )
+            else:
+                suite = _validate_assessment_artifact(
+                    raw_suite, TestSuite, run_id, "Assessment Tester"
+                )
+                with session_scope(factory) as session:
+                    Repository(session).save_test_suite(run_id, suite)
+                emit(
+                    EventType.AGENT_PROGRESS,
+                    current,
+                    "Assessment test suite persisted.",
+                    data={"artifact": "test_suite", "suite_id": suite.id, "available": True},
+                )
+        assessment_runner = (
+            getattr(agent_set.tester, "run_assessment_tests", None)
+            if run.mode == RunMode.ASSESSMENT and suite is not None
+            else None
+        )
+        output = (
+            assessment_runner(ctx, journeys, suite)
+            if callable(assessment_runner)
+            else agent_set.tester.run_tests(ctx, journeys)
+        )
         cases: list[TestCase] = _check_items(output.test_cases, TestCase, run_id, "Tester (test_cases)")
         results: list[TestResult] = _check_items(output.test_results, TestResult, run_id, "Tester (test_results)")
+        if run.mode == RunMode.ASSESSMENT:
+            cases = _unique_by_id(cases, "test case")
+            results = _unique_results_by_case(_unique_by_id(results, "test result"))
+            if suite is not None:
+                cases = [
+                    case.model_copy(update={"suite_id": suite.id})
+                    if case.suite_id is None
+                    else case
+                    for case in cases
+                ]
+                if not suite.test_case_ids:
+                    suite = suite.model_copy(update={"test_case_ids": [case.id for case in cases]})
+                    with session_scope(factory) as session:
+                        Repository(session).save_test_suite(run_id, suite)
         with session_scope(factory) as session:
             repo = Repository(session)
             for case in cases:
@@ -207,9 +324,19 @@ def run_pipeline(
         current = AgentName.REPORTER
         _set_status(factory, run_id, RunStatus.REPORTING, emit)
         emit(EventType.AGENT_STARTED, current, "Reporter started.")
-        bugs: list[BugReport] = _check_items(
-            agent_set.reporter.report(ctx, journeys, cases, results), BugReport, run_id, "Reporter"
+        assessment_reporter = (
+            getattr(agent_set.reporter, "report_assessment", None)
+            if run.mode == RunMode.ASSESSMENT
+            else None
         )
+        raw_bugs = (
+            assessment_reporter(ctx, journeys, cases, results, assessment_map, suite)
+            if callable(assessment_reporter)
+            else agent_set.reporter.report(ctx, journeys, cases, results)
+        )
+        bugs: list[BugReport] = _check_items(raw_bugs, BugReport, run_id, "Reporter")
+        if run.mode == RunMode.ASSESSMENT:
+            bugs = _unique_by_id(bugs, "bug report")
         with session_scope(factory) as session:
             repo = Repository(session)
             for bug in bugs:

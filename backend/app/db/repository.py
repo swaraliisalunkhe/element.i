@@ -38,10 +38,15 @@ from app.db.models import (
     StepResultRow,
     TestCaseRow,
     TestResultRow,
+    AssessmentMapRow,
+    TestSuiteRow,
 )
 from app.schemas import (
     AgentEvent,
+    AssessmentMap,
     BugReport,
+    Coverage,
+    CoverageCount,
     EvidenceMeta,
     Journey,
     RunCreate,
@@ -50,6 +55,7 @@ from app.schemas import (
     TestCase,
     TestCaseWithResult,
     TestResult,
+    TestSuite,
     new_id,
     utc_now,
 )
@@ -123,6 +129,7 @@ class Repository:
             target_url=data.target_url,
             status=RunStatus.PENDING.value,
             agent_mode=data.agent_mode.value,
+            mode=getattr(data.mode, "value", data.mode),
             max_pages=data.max_pages,
             max_depth=data.max_depth,
             max_tests=data.max_tests,
@@ -184,6 +191,190 @@ class Repository:
                     row.started_at = now
         return len(rows)
 
+    # ------------------------------------------------------ assessment artifacts
+
+    def save_assessment_map(self, run_id: str, data: AssessmentMap | dict) -> dict:
+        """Create or replace the assessment map for a run."""
+        self._require_run(run_id)
+        assessment_map = self._validate_assessment_map(run_id, data)
+        serialized = assessment_map.model_dump(mode="json")
+
+        with self._write():
+            row = self.session.get(AssessmentMapRow, run_id)
+
+            if row is None:
+                row = AssessmentMapRow(
+                    run_id=run_id,
+                    data=serialized,
+                )
+                self.session.add(row)
+            else:
+                row.data = serialized
+
+        return row.data
+
+    def get_assessment_map(self, run_id: str) -> dict | None:
+        """Return the assessment map, or None if not generated yet."""
+        self._require_run(run_id)
+
+        row = self.session.get(AssessmentMapRow, run_id)
+
+        return None if row is None else row.data
+
+    def save_test_suite(self, run_id: str, data: TestSuite | dict) -> dict:
+        """Create or replace the generated test suite for a run."""
+        self._require_run(run_id)
+        suite = self._validate_test_suite(run_id, data)
+        suite_id = suite.id
+        serialized = suite.model_dump(mode="json")
+
+        with self._write():
+            row = self.session.scalar(
+                select(TestSuiteRow).where(
+                    TestSuiteRow.run_id == run_id
+                )
+            )
+
+            if row is None:
+                row = TestSuiteRow(
+                    id=suite_id,
+                    run_id=run_id,
+                    data=serialized,
+                )
+                self.session.add(row)
+            else:
+                if row.id != suite_id:
+                    raise ConflictError(
+                        "A different test suite already exists for this run."
+                    )
+                row.data = serialized
+
+        return row.data
+
+    def get_coverage(self, run_id: str) -> Coverage | None:
+        """Calculate assessment coverage from persisted artifacts and executions."""
+        self._require_run(run_id)
+        stored_map = self.get_assessment_map(run_id)
+        stored_suite = self.get_test_suite(run_id)
+        if stored_map is None and stored_suite is None:
+            return None
+
+        assessment_map = AssessmentMap.model_validate(stored_map) if stored_map else None
+        suite = TestSuite.model_validate(stored_suite) if stored_suite else None
+        question_ids = {question.id for question in assessment_map.questions} if assessment_map else set()
+        question_by_id = {
+            question.id: question for question in assessment_map.questions
+        } if assessment_map else {}
+
+        executed_statuses = {
+            TestStatus.PASSED.value,
+            TestStatus.FAILED.value,
+            TestStatus.ERROR.value,
+        }
+        result_rows = list(
+            self.session.scalars(
+                select(TestResultRow)
+                .where(
+                    TestResultRow.run_id == run_id,
+                    TestResultRow.status.in_(executed_statuses),
+                )
+                .options(selectinload(TestResultRow.step_results))
+            )
+        )
+        case_ids = {row.test_case_id for row in result_rows}
+        cases = {
+            case.id: case
+            for case in self.session.scalars(
+                select(TestCaseRow).where(TestCaseRow.id.in_(case_ids))
+            )
+        } if case_ids else {}
+
+        exercised_questions: set[str] = set()
+        observed_states: set[tuple[str, str]] = set()
+        executed_scenarios: set[str] = set()
+        for result in result_rows:
+            case = cases.get(result.test_case_id)
+            if case is None:
+                continue
+            if case.scenario is not None:
+                executed_scenarios.add(case.scenario)
+            for cover in case.covers or []:
+                question_id = cover.get("question_id") if isinstance(cover, dict) else None
+                if question_id in question_ids:
+                    exercised_questions.add(question_id)
+            for step in result.step_results:
+                observed = step.observed or {}
+                question_id = observed.get("question_id")
+                if question_id not in question_ids:
+                    continue
+                exercised_questions.add(question_id)
+                state = observed.get("state")
+                question = question_by_id[question_id]
+                if state is not None and state in {item.value for item in question.observed_states}:
+                    observed_states.add((question.type.value, state))
+
+        question_counts = CoverageCount(
+            total=len(question_ids),
+            exercised=len(exercised_questions),
+        )
+        questions_by_type = {
+            question_type.value: CoverageCount(
+                total=sum(question.type.value == question_type.value for question in question_by_id.values()),
+                exercised=sum(
+                    question.type.value == question_type.value and question.id in exercised_questions
+                    for question in question_by_id.values()
+                ),
+            )
+            for question_type in {question.type for question in question_by_id.values()}
+        }
+        applicable_states = {
+            (question.type.value, state.value)
+            for question in question_by_id.values()
+            for state in question.observed_states
+        }
+        planned_scenarios = {
+            target.scenario.value for target in suite.coverage_targets
+        } if suite else set()
+        scenario_counts = CoverageCount(
+            total=len(planned_scenarios),
+            exercised=len(planned_scenarios & executed_scenarios),
+        )
+        return Coverage(
+            questions=question_counts,
+            questions_by_type=questions_by_type,
+            states=CoverageCount(
+                total=len(applicable_states),
+                exercised=len(applicable_states & observed_states),
+            ),
+            scenarios=scenario_counts,
+        )
+
+    @staticmethod
+    def _validate_assessment_map(run_id: str, data: AssessmentMap | dict) -> AssessmentMap:
+        assessment_map = data if isinstance(data, AssessmentMap) else AssessmentMap.model_validate(data)
+        if assessment_map.run_id != run_id:
+            raise BadRequestError("The assessment map run_id must match the requested run.")
+        return assessment_map
+
+    @staticmethod
+    def _validate_test_suite(run_id: str, data: TestSuite | dict) -> TestSuite:
+        suite = data if isinstance(data, TestSuite) else TestSuite.model_validate(data)
+        if suite.run_id != run_id:
+            raise BadRequestError("The test suite run_id must match the requested run.")
+        return suite
+
+    def get_test_suite(self, run_id: str) -> dict | None:
+        """Return the generated test suite, or None if not generated."""
+        self._require_run(run_id)
+
+        row = self.session.scalar(
+            select(TestSuiteRow).where(
+                TestSuiteRow.run_id == run_id
+            )
+        )
+
+        return None if row is None else row.data
+    
     # ---------------------------------------------------------------- journeys
 
     def add_journey(self, journey: Journey) -> Journey:
@@ -222,6 +413,12 @@ class Repository:
                 raise BadRequestError(
                     f"Journey '{test_case.journey_id}' does not exist in run '{test_case.run_id}'."
                 )
+        if test_case.suite_id is not None:
+            suite = self.session.get(TestSuiteRow, test_case.suite_id)
+            if suite is None or suite.run_id != test_case.run_id:
+                raise BadRequestError(
+                    f"Test suite '{test_case.suite_id}' does not exist in run '{test_case.run_id}'."
+                )
         row = TestCaseRow(
             id=test_case.id,
             run_id=test_case.run_id,
@@ -233,6 +430,13 @@ class Repository:
             expected_result=test_case.expected_result,
             generated_by=test_case.generated_by.value,
             created_at=test_case.created_at,
+            suite_id=test_case.suite_id,
+            scenario=(
+                getattr(test_case.scenario, "value", test_case.scenario)
+                if test_case.scenario is not None
+                else None
+            ),
+            covers=[cover.model_dump(mode="json") for cover in test_case.covers],
         )
         with self._write():
             self.session.add(row)
@@ -335,6 +539,11 @@ class Repository:
                 duration_ms=step.duration_ms,
                 error_message=step.error_message,
                 actual=step.actual,
+                observed=(
+                    step.observed.model_dump(mode="json")
+                    if step.observed is not None
+                    else None
+                ),
                 evidence_id=step.evidence_id,
             )
             for step in result.step_results
@@ -395,6 +604,16 @@ class Repository:
             confidence=bug.confidence,
             generated_by=bug.generated_by.value,
             created_at=bug.created_at,
+            assessment_context=(
+            bug.assessment_context.model_dump(mode="json")
+               if hasattr(bug.assessment_context, "model_dump")
+               else bug.assessment_context
+),
+reproducibility=(
+    getattr(bug.reproducibility, "value", bug.reproducibility)
+    if bug.reproducibility is not None
+    else None
+),
         )
         with self._write():
             self.session.add(row)

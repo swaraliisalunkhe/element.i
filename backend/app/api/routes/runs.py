@@ -16,10 +16,13 @@ from app.db import Repository
 from app.orchestrator import start_run
 from app.schemas import (
     AgentEvent,
+    AssessmentMap,
     BugReport,
     Journey,
     RunCreate,
+    RunDetail,
     RunResponse,
+    TestSuite,
     TestCaseWithResult,
 )
 
@@ -56,9 +59,29 @@ def list_runs(
     return repo.list_runs(limit=limit, offset=offset)
 
 
-@router.get("/{run_id}", response_model=RunResponse)
-def get_run(run_id: str, repo: Repository = Depends(get_repo)) -> RunResponse:
-    return repo.get_run(run_id)
+@router.get("/{run_id}", response_model=RunDetail)
+def get_run(run_id: str, repo: Repository = Depends(get_repo)) -> RunDetail:
+    run = repo.get_run(run_id)
+    stored_map = repo.get_assessment_map(run_id)
+    stored_suite = repo.get_test_suite(run_id)
+    return RunDetail(
+        **run.model_dump(mode="python"),
+        assessment_map=(
+            AssessmentMap.model_validate(stored_map)
+            if stored_map is not None
+            else None
+        ),
+        suite=(
+            TestSuite.model_validate(stored_suite)
+            if stored_suite is not None
+            else None
+        ),
+        coverage=(
+            repo.get_coverage(run_id)
+            if stored_map is not None or stored_suite is not None
+            else None
+        ),
+    )
 
 
 @router.get("/{run_id}/journeys", response_model=list[Journey])

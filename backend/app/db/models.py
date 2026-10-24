@@ -44,6 +44,9 @@ class RunRow(Base):
     target_url: Mapped[str] = mapped_column(String(1000))
     status: Mapped[str] = mapped_column(String(20), index=True)
     agent_mode: Mapped[str] = mapped_column(String(10))
+    mode: Mapped[str] = mapped_column(
+        String(20), default="generic", server_default="generic"
+    )
     max_pages: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
     max_tests: Mapped[int] = mapped_column(Integer)
@@ -83,6 +86,19 @@ class TestCaseRow(Base):
     expected_result: Mapped[str] = mapped_column(Text)
     generated_by: Mapped[str] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    suite_id: Mapped[str | None] = mapped_column(
+        ForeignKey("test_suites.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    scenario: Mapped[str | None] = mapped_column(
+        String(40), nullable=True
+    )
+
+    covers: Mapped[list[Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
 
 
 class TestResultRow(Base):
@@ -124,6 +140,9 @@ class StepResultRow(Base):
     actual: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Plain text on purpose (no foreign key): the evidence row is saved after the step rows.
     evidence_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    observed: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
 
 
 class EvidenceRow(Base):
@@ -164,6 +183,13 @@ class BugRow(Base):
     confidence: Mapped[float] = mapped_column(Float)
     generated_by: Mapped[str] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    assessment_context: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+
+    reproducibility: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
 
     evidence: Mapped[list["EvidenceRow"]] = relationship(
         secondary=bug_evidence_table, order_by="EvidenceRow.created_at"
@@ -183,3 +209,31 @@ class AgentEventRow(Base):
     message: Mapped[str] = mapped_column(String(1000))
     data: Mapped[dict[str, Any]] = mapped_column(JSON)
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime)
+
+class AssessmentMapRow(Base):
+    __tablename__ = "assessment_maps"
+
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    data: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class TestSuiteRow(Base):
+    __tablename__ = "test_suites"
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+    )
+
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+    )
+
+    data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    
