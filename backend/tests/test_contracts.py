@@ -11,8 +11,8 @@ from app.core.constants import (
     RunStatus, Severity, TestStatus, can_transition,
 )
 from app.schemas import (
-    AgentEvent, BugReport, EvidenceMeta, Journey, RunCreate, RunResponse,
-    TestCase, TestResult, TestStep,
+    AgentEvent, AssessmentMap, BugReport, EvidenceMeta, Journey, RunCreate, RunDetail,
+    RunResponse, TestCase, TestResult, TestStep, TestSuite,
 )
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "shared" / "contracts"
@@ -26,6 +26,9 @@ MODEL_FOR_FILE = {
     "bug_report.json": BugReport,
     "evidence.json": EvidenceMeta,
     "agent_event.json": AgentEvent,
+    "assessment_map.json": AssessmentMap,
+    "test_suite.json": TestSuite,
+    "run_detail.json": RunDetail,
 }
 
 
@@ -39,12 +42,14 @@ def test_frozen_enum_values():
     assert {e.value for e in RunStatus} == {
         "pending", "exploring", "testing", "reporting", "completed", "failed"}
     assert {e.value for e in Severity} == {"critical", "high", "medium", "low"}
-    assert {e.value for e in BugCategory} == {
-        "functional", "form_validation", "navigation", "ui_layout", "content",
-        "accessibility", "performance", "security", "console_error", "network_error"}
+    assert {e.value for e in BugCategory} == { "functional", "form_validation", "navigation", "ui_layout", "content",
+        "accessibility", "performance", "security", "console_error", "network_error",
+        "validation", "server_error", "ui", "answer_state", "timer", "evaluation"
+        }
     assert {e.value for e in BrowserAction} == {
         "navigate", "click", "fill", "select", "check", "uncheck", "press", "hover",
-        "wait", "assert_visible", "assert_text", "assert_url", "screenshot"}
+        "wait", "assert_visible", "assert_text", "assert_url", "screenshot",
+        "submit", "type_code", "run_code", "wait_timer", "assert_state", "assert_value"}
     assert {e.value for e in AgentName} == {"orchestrator", "explorer", "tester", "reporter"}
     assert {e.value for e in TestStatus} == {"passed", "failed", "skipped", "error"}
     assert {e.value for e in AgentMode} == {"mock", "real"}

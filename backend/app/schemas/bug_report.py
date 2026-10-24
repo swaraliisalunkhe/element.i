@@ -4,8 +4,25 @@ from datetime import datetime
 
 from pydantic import Field
 
-from app.core.constants import BugCategory, GenerationMode, Severity
+from app.core.constants import (
+    BugCategory,
+    GenerationMode,
+    LifecycleStage,
+    QuestionState,
+    QuestionType,
+    Severity,
+)
 from app.schemas.common import ContractModel, EvidenceMeta, new_id, utc_now
+
+
+class AssessmentContext(ContractModel):
+    """Where in the assessment the bug happened. Every field is optional."""
+
+    section_id: str | None = Field(default=None, max_length=64)
+    question_id: str | None = Field(default=None, max_length=64)
+    question_type: QuestionType | None = None
+    state: QuestionState | None = None
+    lifecycle_stage: LifecycleStage | None = None
 
 
 class BugReport(ContractModel):
@@ -22,6 +39,10 @@ class BugReport(ContractModel):
     actual_behavior: str = Field(min_length=1)
     page_url: str | None = Field(default=None, max_length=1000)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    assessment_context: AssessmentContext | None = None
+    reproducibility: str | None = Field(
+        default=None, pattern=r"^\d+/\d+$", description='Replay result such as "2/2".'
+    )
     evidence: list[EvidenceMeta] = Field(default_factory=list)
     generated_by: GenerationMode = GenerationMode.MOCK
     created_at: datetime = Field(default_factory=utc_now)
