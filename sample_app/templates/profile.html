@@ -1,22 +1,35 @@
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Profile | Code Apex</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/dashboard?email={{ email }}">Dashboard</a>
-        <a href="/contact">Contact</a>
-    </nav>
-    <main>
-        <h1>My Profile</h1>
-        <p>Name: {{ user.name }}</p>
-        <p>Email: {{ email }}</p>
-        <a class="button" href="/dashboard?email={{ email }}">Back to Dashboard</a>
-    </main>
-</body>
-</html>
+{% block title %}Candidate Profile | Code Apex{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto;">
+    <div class="card" style="padding: 36px;">
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+            <div class="avatar-circle" style="width: 54px; height: 54px; font-size: 22px;">
+                {{ user.name[:1] | upper }}
+            </div>
+            <div>
+                <h1 style="font-size: 22px; font-weight: 800;">{{ user.name }}</h1>
+                <p style="font-size: 14px; color: var(--text-secondary);">Candidate Account</p>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-light); padding-top: 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;">
+                <span style="color: var(--text-muted);">Registered Email:</span>
+                <strong>{{ email }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;">
+                <span style="color: var(--text-muted);">Assessment Status:</span>
+                <span class="status-badge qualified">Active</span>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <a href="/dashboard" class="btn btn-primary btn-sm">Go to Dashboard</a>
+            <a href="/assessments" class="btn btn-secondary btn-sm">Explore Tests</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

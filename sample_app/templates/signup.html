@@ -1,36 +1,45 @@
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up | Code Apex</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/signup">Sign Up</a>
-        <a href="/login">Login</a>
-        <a href="/contact">Contact</a>
-    </nav>
+{% block title %}Create Account | Code Apex{% endblock %}
 
-    <main>
-        <h1>Create an Account</h1>
-        <form action="/signup" method="post">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" required>
+{% block content %}
+<div style="max-width: 440px; margin: 40px auto;">
+    <div class="card" style="padding: 36px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="brand-icon" style="margin: 0 auto 16px auto;">CA</div>
+            <h1 style="font-size: 24px; font-weight: 800;">Create Candidate Account</h1>
+            <p style="font-size: 14px; color: var(--text-secondary); margin-top: 6px;">
+                Register to take enterprise online assessments.
+            </p>
+        </div>
 
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" required>
+        <form action="/signup" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label for="email" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Work / Candidate Email</label>
+                <input id="email" name="email" type="email" required
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
 
-            <label for="confirm_password">Confirm Password</label>
-            <input id="confirm_password" name="confirm_password"
-                   type="password" required>
+            <div style="margin-bottom: 16px;">
+                <label for="password" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Password</label>
+                <input id="password" name="password" type="password" required
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
 
-            <button id="signup-btn" type="submit">Sign Up</button>
+            <div style="margin-bottom: 24px;">
+                <label for="confirm_password" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Confirm Password</label>
+                <input id="confirm_password" name="confirm_password" type="password" required
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
+
+            <button id="signup-btn" type="submit" class="btn btn-primary" style="width: 100%;">
+                Create Account →
+            </button>
         </form>
-        <p>Already registered? <a href="/login">Log in</a></p>
-    </main>
-</body>
-</html>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-light); font-size: 13px; text-align: center; color: var(--text-secondary);">
+            Already registered? <a href="/login" style="color: var(--primary-orange); font-weight: 600;">Sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,26 +1,165 @@
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Apex | Home</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/signup">Sign Up</a>
-        <a href="/login">Login</a>
-        <a href="/reset-password">Forgot Password?</a>
-        <a href="/contact">Contact</a>
-    </nav>
+{% block title %}Code Apex | Enterprise Online Assessment Platform{% endblock %}
 
-    <main>
-        <h1>Welcome to Code Apex Sample App</h1>
-        <p>A sample account application for testing our autonomous AI QA agents.</p>
-        <a class="button" href="/signup">Create Account</a>
-        <a class="button" href="/login">Login</a>
-    </main>
-</body>
-</html>
+{% block hero %}
+<!-- DARK HERO SECTION (Directly matching iMocha Screenshot 1) -->
+<section class="hero-dark-wrapper">
+    <div class="hero-content">
+        <div class="hero-eyebrow-box">
+            <span class="eyebrow-square"></span>
+            <span>SKILLS AND TECHNICAL ASSESSMENT PLATFORM</span>
+        </div>
+
+        <h1 class="hero-title-serif" id="home-title">
+            The Context Layer for<br>
+            <span>Code Apex Assessment Platform</span>
+        </h1>
+
+        <p class="hero-desc">
+            Transform technical screening into real-time, objective evaluation for smarter engineering decisions and
+            validated candidate execution.
+        </p>
+
+        <div class="hero-cta-group">
+            <a href="/assessments/assessment-python-se/mcq" class="btn btn-primary btn-lg" id="btn-start-mcq">
+                Start Assessment →
+            </a>
+            <a href="/dashboard" class="btn btn-dark btn-lg" id="btn-view-dashboard">
+                Recruiter Dashboard
+            </a>
+        </div>
+
+
+    </div>
+</section>
+{% endblock %}
+
+{% block content_wrapper %}
+<!-- LIGHT CONTENT SECTION WITH PATTERNED GRID CANVAS (Directly matching iMocha Screenshot 3) -->
+<section class="light-content-wrapper">
+    <div class="section-container">
+        <div
+            style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; margin-bottom: 36px;">
+            <div>
+                <div class="section-eyebrow-box">
+                    <span class="eyebrow-square"></span>
+                    <span>THE EVALUATION LAYER • EXPLAINED</span>
+                </div>
+
+                <h2 class="section-title-serif">
+                    Two Assessment Modes,<br>
+                    One Defensible View of Candidate Ability
+                </h2>
+
+                <p class="section-desc">
+                    Technical MCQ Screening reveals theoretical depth and complexity awareness. Hands-On Coding Studio
+                    reveals real-time problem solving. Together they replace resumes with evidence hiring teams can act
+                    on.
+                </p>
+            </div>
+
+            <div style="margin-top: 24px;">
+                <a href="/assessments" class="btn btn-primary btn-lg" id="btn-browse-assessments">
+                    Explore Assessment Catalog
+                </a>
+            </div>
+        </div>
+
+        <!-- Comparison Cards Grid (Screenshot 3 Cards) -->
+        <div class="comparison-grid">
+            <div class="comparison-card">
+                <div>
+                    <div class="card-num-eyebrow">
+                        <span>01 — THEORETICAL SCREENING</span>
+                        <span>🔗</span>
+                    </div>
+
+                    <h3 class="card-title-serif">What is Technical MCQ Screening?</h3>
+
+                    <p class="card-body-text">
+                        Standardized multiple-choice examinations covering algorithmic complexity, language internals,
+                        concurrency models, and system architecture. Features question navigation palettes and negative
+                        marking penalties for objective measurement.
+                    </p>
+                </div>
+
+                <div>
+                    <a href="/assessments/assessment-python-se/mcq" class="btn btn-secondary btn-sm"
+                        style="width: 100%;">
+                        Explore MCQ Assessment →
+                    </a>
+                </div>
+            </div>
+
+            <div class="comparison-card">
+                <div>
+                    <div class="card-num-eyebrow">
+                        <span>02 — PRACTICAL EXECUTION</span>
+                        <span>⚙</span>
+                    </div>
+
+                    <h3 class="card-title-serif">What is Hands-On Coding Studio?</h3>
+
+                    <p class="card-body-text">
+                        Real-time Python execution environment with immediate feedback. Candidates write algorithmic
+                        solutions evaluated against public test specifications and comprehensive hidden boundary
+                        constraints.
+                    </p>
+                </div>
+
+                <div>
+                    <a href="/assessments/assessment-python-se/coding" class="btn btn-secondary btn-sm"
+                        style="width: 100%;">
+                        Launch Coding Studio →
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preloaded Assessments Catalog Preview -->
+        <div class="section-heading" style="margin-top: 56px;">
+            <h2>Featured Corporate Assessments</h2>
+            <a href="/dashboard" class="btn btn-secondary btn-sm" id="btn-goto-dashboard">
+                View Evaluation Dashboard →
+            </a>
+        </div>
+
+        <div class="assessments-grid">
+            {% for key, test in assessments.items() %}
+            <div class="assessment-card" id="card-{{ test.id }}">
+                <div>
+                    <div class="assessment-top">
+                        <span class="assessment-badge orange">{{ test.type }}</span>
+                        <span style="font-size: 13px; font-weight: 600; color: #6b7280;">{{ test.duration_minutes }}
+                            Mins</span>
+                    </div>
+
+                    <h3 class="assessment-title">{{ test.title }}</h3>
+                    <div class="assessment-role">Target Role: {{ test.role }}</div>
+                    <p class="assessment-desc">{{ test.description }}</p>
+
+                    <div class="assessment-meta">
+                        <span class="meta-item">📝 {{ test.mcq_questions|length }} Questions ({{ test.mcq_total_marks }}
+                            pts)</span>
+                        <span class="meta-item">💻 1 Coding Problem ({{ test.coding_total_marks }} pts)</span>
+                        <span class="meta-item">🎯 Passing Threshold: {{ test.passing_percentage }}%</span>
+                    </div>
+                </div>
+
+                <div class="assessment-actions">
+                    <a href="/assessments/{{ test.id }}/mcq" class="btn btn-primary btn-sm"
+                        id="btn-take-mcq-{{ test.id }}">
+                        Take MCQ Section →
+                    </a>
+                    <a href="/assessments/{{ test.id }}/coding" class="btn btn-secondary btn-sm"
+                        id="btn-take-code-{{ test.id }}">
+                        Take Coding Section
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

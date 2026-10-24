@@ -1,0 +1,511 @@
+
+{% extends "base.html" %}
+
+{% block title %}Coding Studio | {{ assessment.title }} | Code Apex{% endblock %}
+
+{% block content %}
+<div class="assessment-topbar">
+    <div>
+        <span class="assessment-badge orange">SECTION 2: PRACTICAL CODING STUDIO</span>
+        <h1 style="font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-0.4px;" id="coding-problem-title">
+            {{ problem.title }}
+        </h1>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;">
+        <div class="timer-box" id="test-timer">
+            <span style="color:var(--primary-orange);">⏱</span>
+            <span>38:15 Remaining</span>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm"
+                onclick="submitCodingSolution()"
+                id="btn-top-submit-code">
+            Submit Solution →
+        </button>
+    </div>
+</div>
+
+<div class="coding-layout">
+    <div class="problem-specs-panel">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+            <span class="difficulty-chip" id="chip-difficulty">{{ problem.difficulty }}</span>
+            <span class="assessment-badge" id="chip-points">{{ problem.points }} Total Points</span>
+            <span style="font-size:13px;color:var(--text-muted);font-weight:500;">
+                Limit: <span id="problem-time-limit">{{ problem.time_limit_seconds }}</span>s
+            </span>
+        </div>
+
+        <h2 id="problem-title">{{ problem.title }}</h2>
+
+        <p style="font-size:15px;color:var(--text-secondary);line-height:1.65;margin-bottom:24px;"
+           id="problem-desc">{{ problem.description }}</p>
+
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">
+            Input Format
+        </h3>
+        <div class="code-snippet-box" style="margin-bottom:18px;" id="input-format">
+            {{ problem.input_format }}
+        </div>
+
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">
+            Output Format
+        </h3>
+        <div class="code-snippet-box" style="margin-bottom:18px;" id="output-format">
+            {{ problem.output_format }}
+        </div>
+
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:10px;">
+            Constraints
+        </h3>
+        <ul style="padding-left:20px;font-size:14px;color:var(--text-secondary);margin-bottom:26px;line-height:1.65;"
+            id="constraints-list">
+            {% for c in problem.constraints %}
+            <li>{{ c }}</li>
+            {% endfor %}
+        </ul>
+
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">
+            Public Test Cases
+        </h3>
+        <div id="public-test-cases">
+            {% for tc in problem.test_cases if not tc.hidden %}
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">
+                    {{ tc.name }}
+                </div>
+                <div style="font-size:13px;font-family:var(--font-mono);margin-bottom:4px;">
+                    <strong style="color:#374151;">Input:</strong> {{ tc.input_display }}
+                </div>
+                <div style="font-size:13px;font-family:var(--font-mono);color:var(--success-green);">
+                    <strong style="color:#374151;">Expected:</strong> {{ tc.expected_output }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="background:#fff8f5;border:1px solid #ffd8cc;padding:14px;border-radius:var(--radius-sm);font-size:13px;color:#9a3412;margin-top:22px;line-height:1.5;">
+            ℹ Comprehensive hidden test cases evaluate edge boundaries and other constraints upon submission.
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;">
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <strong style="display:block;margin-bottom:10px;">Coding Questions</strong>
+
+            <div style="display:flex;gap:10px;">
+                <button type="button" class="btn btn-primary btn-sm"
+                        id="question-tab-1"
+                        onclick="switchCodingQuestion(0)">
+                    Question 1
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm"
+                        id="question-tab-2"
+                        onclick="switchCodingQuestion(1)">
+                    Question 2
+                </button>
+            </div>
+
+            <p style="font-size:12px;color:var(--text-muted);margin-top:10px;">
+                Your code is entered in the editor below.
+            </p>
+        </div>
+
+        <form id="coding-submit-form"
+              action="/assessments/{{ assessment.id }}/submit-code"
+              method="POST">
+
+            <input type="hidden" name="candidate_email"
+                   value="{{ candidate_email or 'bob.candidate@example.com' }}">
+
+            <input type="hidden" name="coding_question"
+                   id="coding-question-id"
+                   value="{{ problem.id }}">
+
+            <div class="editor-card">
+                <div class="editor-header">
+                    <div class="editor-language">
+                        <span>🐍</span> Python 3.10 Runtime
+                    </div>
+
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="resetBoilerplate()"
+                            id="btn-reset-code"
+                            style="background:#1e2029;color:#e2e8f0;border-color:#2e3240;">
+                        Reset Code
+                    </button>
+                </div>
+
+                <textarea name="code_solution" id="code-editor"
+                          class="editor-textarea"
+                          spellcheck="false">{{ starter_code }}</textarea>
+
+                <div class="editor-actions-bar">
+                    <button type="button" class="btn btn-secondary"
+                            onclick="runPublicTests()"
+                            id="btn-run-code"
+                            style="background:#1e2029;color:#e2e8f0;border-color:#2e3240;">
+                        ▶ Run Code
+                    </button>
+
+                    <button type="button" class="btn btn-primary"
+                            id="btn-submit-code"
+                            onclick="submitCodingSolution()">
+                        Submit Solution →
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div class="console-card">
+            <div class="console-header">
+                <h3 style="font-size:15px;font-weight:700;">Test Results Console</h3>
+                <div class="test-tab-buttons" id="console-tabs"></div>
+            </div>
+
+            <div class="test-console-output" id="console-output">
+                Click "Run Code" to execute your code against public test cases.
+            </div>
+        </div>
+
+        <div class="card" style="padding:24px;">
+            <h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">
+                Submission History
+            </h3>
+
+            <table class="breakdown-table" id="coding-history-table">
+                <thead>
+                    <tr>
+                        <th>Attempt</th>
+                        <th>Timestamp</th>
+                        <th>Verdict</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+
+                <tbody id="coding-history-tbody">
+                    {% if submissions_history %}
+                        {% for sub in submissions_history %}
+                        <tr>
+                            <td>Attempt #{{ sub.attempt }}</td>
+                            <td>{{ sub.submitted_at }}</td>
+                            <td>
+                                {% if sub.verdict == 'Accepted' %}
+                                <span class="status-badge qualified">Accepted</span>
+                                {% else %}
+                                <span class="status-badge review">{{ sub.verdict }}</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ sub.score }} / 100</strong></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px;">
+                                No submissions recorded yet. Click "Submit Solution" to record an attempt.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Both problem definitions are supplied by data.py through app.py.
+    const codingProblems = {{ coding_problems | tojson }};
+    const codeEditor = document.getElementById("code-editor");
+
+    const initialProblemId = {{ problem.id | tojson }};
+
+    let currentQuestionIndex = Math.max(
+        0,
+        codingProblems.findIndex(p => p.id === initialProblemId)
+    );
+
+    // Keep a separate editor draft for each question.
+    const editorDrafts = codingProblems.map(
+        problem => problem.starter_code || ""
+    );
+
+    // INTENTIONAL BUG CODE-01:
+    // Capture Question 1's code when leaving it for the first time.
+    // Returning to Question 1 and editing the visible editor does not
+    // update this snapshot. Submission therefore sends stale code.
+    let questionOneSubmissionSnapshot = editorDrafts[0];
+    let questionOneSnapshotCaptured = false;
+
+    let latestRunResults = [];
+
+    function currentProblem() {
+        return codingProblems[currentQuestionIndex];
+    }
+
+    function switchCodingQuestion(questionIndex) {
+        if (
+            questionIndex < 0 ||
+            questionIndex >= codingProblems.length
+        ) {
+            return;
+        }
+
+        // Save the current editor text before switching away.
+        if (currentQuestionIndex === 0 && questionIndex !== 0) {
+            editorDrafts[0] = codeEditor.value;
+
+            if (!questionOneSnapshotCaptured) {
+                questionOneSubmissionSnapshot = codeEditor.value;
+                questionOneSnapshotCaptured = true;
+            }
+        } else {
+            editorDrafts[currentQuestionIndex] = codeEditor.value;
+        }
+
+        currentQuestionIndex = questionIndex;
+
+        const problem = currentProblem();
+
+        document.getElementById("coding-question-id").value = problem.id;
+        codeEditor.value = editorDrafts[questionIndex];
+
+        document.getElementById("question-tab-1").classList.toggle(
+            "btn-primary",
+            questionIndex === 0
+        );
+        document.getElementById("question-tab-1").classList.toggle(
+            "btn-secondary",
+            questionIndex !== 0
+        );
+
+        document.getElementById("question-tab-2").classList.toggle(
+            "btn-primary",
+            questionIndex === 1
+        );
+        document.getElementById("question-tab-2").classList.toggle(
+            "btn-secondary",
+            questionIndex !== 1
+        );
+
+        // Update the displayed problem details.
+        document.getElementById("coding-problem-title").textContent =
+            problem.title;
+        document.getElementById("problem-title").textContent =
+            problem.title;
+        document.getElementById("problem-desc").textContent =
+            problem.description;
+        document.getElementById("chip-difficulty").textContent =
+            problem.difficulty;
+        document.getElementById("chip-points").textContent =
+            `${problem.points} Total Points`;
+        document.getElementById("problem-time-limit").textContent =
+            problem.time_limit_seconds;
+        document.getElementById("input-format").textContent =
+            problem.input_format;
+        document.getElementById("output-format").textContent =
+            problem.output_format;
+
+        const constraintsList = document.getElementById("constraints-list");
+        constraintsList.replaceChildren();
+
+        (problem.constraints || []).forEach(constraint => {
+            const li = document.createElement("li");
+            li.textContent = constraint;
+            constraintsList.appendChild(li);
+        });
+
+        const publicTests = document.getElementById("public-test-cases");
+        publicTests.replaceChildren();
+
+        (problem.test_cases || [])
+            .filter(testCase => !testCase.hidden)
+            .forEach(testCase => {
+                const card = document.createElement("div");
+
+                card.style.cssText =
+                    "background:#f8fafc;border:1px solid #e2e8f0;" +
+                    "border-radius:var(--radius-sm);padding:14px 16px;" +
+                    "margin-bottom:12px;";
+
+                const name = document.createElement("div");
+                name.style.cssText =
+                    "font-size:12px;font-weight:700;color:#64748b;" +
+                    "text-transform:uppercase;margin-bottom:6px;";
+                name.textContent = testCase.name;
+
+                const input = document.createElement("div");
+                input.style.cssText =
+                    "font-size:13px;font-family:var(--font-mono);" +
+                    "margin-bottom:4px;";
+                input.textContent = `Input: ${testCase.input_display || ""}`;
+
+                const expected = document.createElement("div");
+                expected.style.cssText =
+                    "font-size:13px;font-family:var(--font-mono);" +
+                    "color:var(--success-green);";
+                expected.textContent =
+                    `Expected: ${JSON.stringify(testCase.expected_output)}`;
+
+                card.append(name, input, expected);
+                publicTests.appendChild(card);
+            });
+
+        // Clear old console results when switching questions.
+        latestRunResults = [];
+        document.getElementById("console-tabs").replaceChildren();
+        document.getElementById("console-output").textContent =
+            'Click "Run Code" to execute this question.';
+    }
+
+    function resetBoilerplate() {
+        if (confirm("Reset editor to default starter code?")) {
+            codeEditor.value = currentProblem().starter_code || "";
+            editorDrafts[currentQuestionIndex] = codeEditor.value;
+        }
+    }
+
+    async function runPublicTests() {
+        const problem = currentProblem();
+        const code = codeEditor.value;
+
+        editorDrafts[currentQuestionIndex] = code;
+
+        const consoleElem = document.getElementById("console-output");
+        consoleElem.textContent = "Executing code against public test cases...";
+
+        try {
+            const response = await fetch(
+                "/assessments/{{ assessment.id }}/run-code",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        coding_question: problem.id
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                consoleElem.textContent =
+                    `${data.verdict || "Evaluation Error"}:\n` +
+                    `${data.error_details || data.detail || ""}`;
+                return;
+            }
+
+            latestRunResults = data.test_results || [];
+
+            const consoleTabs = document.getElementById("console-tabs");
+            consoleTabs.replaceChildren();
+
+            latestRunResults.forEach((testCase, index) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className =
+                    "test-tab-btn" + (index === 0 ? " active" : "");
+                button.textContent = `Test ${index + 1}`;
+                button.addEventListener("click", () => switchTestTab(index));
+                consoleTabs.appendChild(button);
+            });
+
+            if (latestRunResults.length) {
+                switchTestTab(0);
+            } else {
+                consoleElem.textContent = "No public test cases were returned.";
+            }
+        } catch (err) {
+            consoleElem.textContent =
+                `Network error executing code: ${err.message}`;
+        }
+    }
+
+    function submitCodingSolution() {
+        const problem = currentProblem();
+
+        document.getElementById("coding-question-id").value = problem.id;
+
+        // INTENTIONAL BUG CODE-01:
+        // If Question 1 was left and revisited, submit the old snapshot
+        // instead of the latest text currently visible in the editor.
+        const submittedCode =
+            currentQuestionIndex === 0 && questionOneSnapshotCaptured
+                ? questionOneSubmissionSnapshot
+                : codeEditor.value;
+
+        codeEditor.value = submittedCode;
+
+        document.getElementById("coding-submit-form").requestSubmit();
+    }
+
+    function switchTestTab(index) {
+        const tabs = document.querySelectorAll(".test-tab-btn");
+
+        tabs.forEach((tab, tabIndex) => {
+            tab.classList.toggle("active", tabIndex === index);
+        });
+
+        const consoleElem = document.getElementById("console-output");
+        const testCase = latestRunResults[index];
+
+        if (!testCase) {
+            consoleElem.textContent =
+                'No execution data. Click "Run Code" first.';
+            return;
+        }
+
+        const statusColor = testCase.passed ? "#10b981" : "#ef4444";
+        const statusText = testCase.passed ? "PASSED ✓" : "FAILED ✗";
+
+        // Use textContent to avoid inserting candidate output as HTML.
+        consoleElem.textContent =
+            `[${statusText}] ${testCase.name || "Test Case"} ` +
+            `(${testCase.execution_time_ms}ms)\n` +
+            "--------------------------------------------------\n" +
+            `Input: ${testCase.input_display || ""}\n` +
+            `Expected: ${JSON.stringify(testCase.expected_output)}\n` +
+            `Actual: ${JSON.stringify(testCase.actual_output)}\n` +
+            (testCase.stdout
+                ? `Output Logs:\n${testCase.stdout}\n`
+                : "") +
+            (testCase.error_message
+                ? `Error:\n${testCase.error_message}`
+                : "");
+
+        consoleElem.style.borderLeft = `3px solid ${statusColor}`;
+    }
+
+    // Initialize the selected problem and its corresponding question tab.
+    document.addEventListener("DOMContentLoaded", () => {
+        const selectedIndex = currentQuestionIndex;
+        const problem = codingProblems[selectedIndex];
+
+        codeEditor.value = problem.starter_code || "";
+        editorDrafts[selectedIndex] = codeEditor.value;
+
+        document.getElementById("coding-question-id").value = problem.id;
+
+        document.getElementById("question-tab-1").classList.toggle(
+            "btn-primary",
+            selectedIndex === 0
+        );
+        document.getElementById("question-tab-1").classList.toggle(
+            "btn-secondary",
+            selectedIndex !== 0
+        );
+
+        document.getElementById("question-tab-2").classList.toggle(
+            "btn-primary",
+            selectedIndex === 1
+        );
+        document.getElementById("question-tab-2").classList.toggle(
+            "btn-secondary",
+            selectedIndex !== 1
+        );
+    });
+</script>
+{% endblock %}

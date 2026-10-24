@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Available Assessments | Code Apex{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="dashboard-title-group">
+        <h1>Available Assessments</h1>
+        <p>Select a standardized online assessment to evaluate technical competencies, algorithmic skills, and backend architecture.</p>
+    </div>
+</div>
+
+<div class="assessments-grid">
+    {% set candidate_query = '' %}
+    {% if candidate_email %}
+    {% set candidate_query = '?candidate_email=' ~ (candidate_email | urlencode) %}
+    {% endif %}
+
+    {% for key, test in assessments.items() %}
+    <div class="assessment-card" id="catalog-card-{{ test.id }}">
+        <div>
+            <div class="assessment-top">
+                <span class="assessment-badge orange">{{ test.type }}</span>
+                <span style="font-size: 13px; font-weight: 600; color: #64748b;">{{ test.duration_minutes }} Minutes</span>
+            </div>
+
+            <h2 class="assessment-title">{{ test.title }}</h2>
+            <div class="assessment-role">Target Role: {{ test.role }}</div>
+            <p class="assessment-desc">{{ test.description }}</p>
+
+            <div style="margin-bottom: 16px;">
+                <span style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Key Skills:</span>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                    {% for skill in test.skills %}
+                    <span style="background: #f1f5f9; color: #334155; font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 500;">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="assessment-meta">
+                <span class="meta-item">📝 {{ test.mcq_questions|length }} Multiple-Choice Questions</span>
+                <span class="meta-item">💻 1 Hands-On Coding Problem</span>
+                <span class="meta-item">📊 {{ test.total_marks }} Total Points</span>
+            </div>
+        </div>
+
+        <div class="assessment-actions">
+            <a href="/assessments/{{ test.id }}/mcq{{ candidate_query }}" class="btn btn-primary btn-sm" id="btn-start-mcq-{{ test.id }}">
+                Take MCQ Section →
+            </a>
+            <a href="/assessments/{{ test.id }}/coding{{ candidate_query }}" class="btn btn-secondary btn-sm" id="btn-start-coding-{{ test.id }}">
+                Take Coding Section →
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

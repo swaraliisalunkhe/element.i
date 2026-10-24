@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Assessment Results | {{ submission.assessment_title }} | Code Apex{% endblock %}
+
+{% block content %}
+<div class="results-header-card">
+    <div>
+        <div style="font-size: 12px; font-weight: 700; color: var(--primary-orange); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px;">
+            TECHNICAL CANDIDATE REPORT
+        </div>
+        <h1 style="font-family: var(--font-serif); font-size: 32px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.5px;" id="result-title">
+            {{ submission.assessment_title }}
+        </h1>
+        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+            Candidate: <strong>{{ submission.candidate_name }}</strong> (<code>{{ submission.candidate_email }}</code>)<br>
+            Evaluation Completed: {{ submission.submitted_at }} • Report ID: <code>{{ submission.id }}</code>
+        </p>
+    </div>
+
+    <div style="text-align: right;">
+        <div class="score-num" id="total-score-display">{{ submission.total_score }}</div>
+        <div class="score-denom">OUT OF {{ submission.max_score }} POINTS ({{ submission.percentage }}%)</div>
+        <div style="margin-top: 12px;">
+            {% if submission.result_status == 'Qualified' %}
+            <span class="status-badge qualified" id="qualification-badge">Qualified</span>
+            {% else %}
+            <span class="status-badge review" id="qualification-badge">Review Needed</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- SECTION 1: MCQ EVALUATION RESULTS -->
+{% if submission.mcq_results %}
+<div class="card">
+    <div class="section-heading">
+        <h2>Section 1: Multiple-Choice Questions (MCQ) Evaluation</h2>
+        <span class="assessment-badge orange">SCORE: {{ submission.mcq_results.total_mcq_score }} / {{ submission.mcq_results.max_mcq_score }}</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 28px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">CORRECT ANSWERS</div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--success-green); margin: 4px 0;" id="mcq-correct-count">
+                {{ submission.mcq_results.correct_count }} / {{ submission.mcq_results.total_questions }}
+            </div>
+            <div style="font-size: 13px; color: #64748b;">+{{ submission.mcq_results.positive_marks }} Marks Earned</div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">INCORRECT ANSWERS</div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--danger-red); margin: 4px 0;" id="mcq-incorrect-count">
+                {{ submission.mcq_results.incorrect_count }}
+            </div>
+            <div style="font-size: 13px; color: var(--danger-red);">
+                -{{ submission.mcq_results.penalty_marks }} Penalty Marks
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">UNATTEMPTED</div>
+            <div style="font-size: 28px; font-weight: 800; color: #64748b; margin: 4px 0;">
+                {{ submission.mcq_results.unattempted_count }}
+            </div>
+            <div style="font-size: 13px; color: #64748b;">0 Marks</div>
+        </div>
+
+        <div style="background: #fff8f5; border: 1px solid #ffd8cc; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #9a3412; font-weight: 700; text-transform: uppercase;">NET MCQ SCORE</div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--primary-orange); margin: 4px 0;" id="mcq-net-score">
+                {{ submission.mcq_results.total_mcq_score }}
+            </div>
+            <div style="font-size: 13px; color: #9a3412;">Maximum Points: {{ submission.mcq_results.max_mcq_score }}</div>
+        </div>
+    </div>
+
+    <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px;">Itemized Question Breakdown</h3>
+    <table class="breakdown-table" id="mcq-breakdown-table">
+        <thead>
+            <tr>
+                <th>Question #</th>
+                <th>Topic / Question Title</th>
+                <th>Recorded Submitted Option</th>
+                <th>Correct Option</th>
+                <th>Evaluation Verdict</th>
+                <th>Score Delta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in submission.mcq_results.question_breakdown %}
+            <tr id="mcq-row-{{ item.id }}">
+                <td><strong>Q{{ item.number }}</strong></td>
+                <td>{{ item.title }}</td>
+                <td>
+                    <span style="font-weight: 700; font-family: var(--font-mono); font-size: 15px;" id="answer-recorded-{{ item.id }}">
+                        Option {{ item.selected_option }}
+                    </span>
+                </td>
+                <td>
+                    <span style="font-weight: 700; font-family: var(--font-mono); font-size: 15px; color: var(--success-green);">
+                        Option {{ item.correct_option }}
+                    </span>
+                </td>
+                <td>
+                    {% if item.status == 'Correct' %}
+                    <span class="status-badge qualified">Correct</span>
+                    {% elif item.status == 'Incorrect' %}
+                    <span class="status-badge review" style="background: var(--danger-bg); color: var(--danger-red); border-color: var(--danger-border);">Incorrect</span>
+                    {% else %}
+                    <span style="color: #64748b; font-size: 13px;">Unattempted</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong style="color: {% if item.marks_awarded > 0 %}var(--success-green){% elif item.marks_awarded < 0 %}var(--danger-red){% else %}#64748b{% endif %}; font-size: 14px;">
+                        {% if item.marks_awarded > 0 %}+{% endif %}{{ item.marks_awarded }} pts
+                    </strong>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- SECTION 2: CODING EVALUATION RESULTS -->
+{% if submission.coding_results %}
+<div class="card">
+    <div class="section-heading">
+        <h2>Section 2: Hands-On Coding Studio Evaluation</h2>
+        <span class="assessment-badge orange">SCORE: {{ submission.coding_results.score }} / {{ submission.coding_results.max_score }}</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 28px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">SUBMISSION VERDICT</div>
+            <div style="font-size: 24px; font-weight: 800; color: var(--text-primary); margin: 4px 0;" id="coding-verdict">
+                {{ submission.coding_results.verdict }}
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">PUBLIC TESTS PASSED</div>
+            <div style="font-size: 24px; font-weight: 800; color: var(--success-green); margin: 4px 0;" id="coding-public-tests">
+                {{ submission.coding_results.passed_public }} / {{ submission.coding_results.total_public }}
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">HIDDEN TESTS STATUS</div>
+            <div style="font-size: 24px; font-weight: 800; color: #64748b; margin: 4px 0;" id="coding-hidden-tests">
+                {{ submission.coding_results.passed_hidden }} / {{ submission.coding_results.total_hidden }} Passed
+            </div>
+        </div>
+
+        <div style="background: #fff8f5; border: 1px solid #ffd8cc; padding: 18px; border-radius: var(--radius-sm);">
+            <div style="font-size: 12px; color: #9a3412; font-weight: 700; text-transform: uppercase;">CODING SCORE AWARDED</div>
+            <div style="font-size: 28px; font-weight: 800; color: var(--primary-orange); margin: 4px 0;" id="coding-awarded-score">
+                {{ submission.coding_results.score }} / 100
+            </div>
+        </div>
+    </div>
+
+    <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px;">Test Case Execution Breakdown</h3>
+    <table class="breakdown-table" id="coding-tests-table">
+        <thead>
+            <tr>
+                <th>Test Case</th>
+                <th>Type</th>
+                <th>Execution Time</th>
+                <th>Evaluation Status</th>
+                <th>Points Awarded</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tc in submission.coding_results.test_results %}
+            <tr>
+                <td><strong>{{ tc.name }}</strong></td>
+                <td>
+                    {% if tc.hidden %}
+                    <span style="background: #f1f5f9; color: #475467; font-size: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Hidden</span>
+                    {% else %}
+                    <span style="background: #e0f2fe; color: #0369a1; font-size: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Public</span>
+                    {% endif %}
+                </td>
+                <td style="font-family: var(--font-mono); font-size: 13px;">{{ tc.execution_time_ms }}ms</td>
+                <td>
+                    {% if tc.passed %}
+                    <span class="status-badge qualified">Passed</span>
+                    {% else %}
+                    <span class="status-badge review" style="background: var(--danger-bg); color: var(--danger-red); border-color: var(--danger-border);">{{ tc.status }}</span>
+                    {% endif %}
+                </td>
+                <td><strong>{{ tc.points }} pts</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="margin-top: 40px; display: flex; gap: 16px;">
+    <a href="/dashboard" class="btn btn-primary" id="btn-return-dashboard">
+        ← Return to Recruiter Dashboard
+    </a>
+    <a href="/assessments" class="btn btn-secondary" id="btn-all-assessments">
+        Explore Assessment Catalog
+    </a>
+</div>
+{% endblock %}
