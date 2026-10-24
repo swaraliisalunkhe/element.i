@@ -14,8 +14,9 @@ from datetime import datetime
 import logging
 import time
 import urllib.parse
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from app.agents.assessment_map import AssessmentMap
 from app.core.agent_interface import AgentContext, TesterOutput
 from app.core.constants import (
     AgentName,
@@ -31,6 +32,9 @@ from app.schemas.common import EvidenceMeta, new_id, utc_now
 from app.schemas.journey import DiscoveredPage, InteractiveElement, Journey
 from app.schemas.test_case import StepResult, TestCase, TestResult, TestStep
 from app.services.browser_driver import BrowserDriver
+
+if TYPE_CHECKING:
+    from app.services.suite_generator import SuiteGenerator
 
 logger = logging.getLogger("code_apex.agents.tester")
 
@@ -53,8 +57,35 @@ class TesterAgent:
 
     __test__ = False  # Prevents pytest from discovering this class as a test suite
 
-    def __init__(self, driver: BrowserDriver | None = None) -> None:
+    def __init__(
+        self,
+        driver: BrowserDriver | None = None,
+        suite_generator: SuiteGenerator | None = None,
+        assessment_map: AssessmentMap | None = None,
+        assessment_map_provider: Callable[[], AssessmentMap | None] | None = None,
+    ) -> None:
         self._driver = driver
+        if suite_generator is not None:
+            self._suite_generator = suite_generator
+        else:
+            from app.services.suite_generator import SuiteGenerator
+
+            self._suite_generator = SuiteGenerator()
+        self._assessment_map = assessment_map
+        self._assessment_map_provider = assessment_map_provider
+
+    def _get_assessment_map(self, journeys: list[Journey]) -> AssessmentMap | None:
+        """Resolve AssessmentMap explicitly, from provider, or by reconstructing from journeys."""
+        if self._assessment_map is not None:
+            return self._assessment_map
+        if self._assessment_map_provider is not None:
+            try:
+                amap = self._assessment_map_provider()
+                if amap is not None:
+                    return amap
+            except Exception:
+                pass
+        return AssessmentMap.from_journeys(journeys)
 
     def run_tests(self, ctx: AgentContext, journeys: list[Journey]) -> TesterOutput:
         """Synchronously execute tests for the given journeys and return TesterOutput."""
@@ -93,6 +124,22 @@ class TesterAgent:
         test_cases: list[TestCase] = []
         max_tests = ctx.run.max_tests
         run_id = ctx.run.id
+
+        amap = self._get_assessment_map(journeys)
+        is_assessment = bool(
+            amap and amap.is_assessment
+            or any("assessment" in (j.name or "").lower() for j in journeys)
+            or any(
+                e.element_type == ElementType.RADIO
+                for j in journeys
+                for p in j.pages
+                for e in p.elements
+            )
+        )
+        if is_assessment:
+            suite_cases = self._suite_generator.generate_suite(ctx, amap, journeys)
+            if suite_cases:
+                return suite_cases[:max_tests]
 
         # If journeys are empty, create a baseline smoke test for the target URL
         if not journeys:

@@ -16,12 +16,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.constants import LLMProvider
 
 # config.py lives at <repo>/backend/app/core/config.py, so the repo root is 3 levels up.
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=REPO_ROOT / ".env",
+        env_file=(REPO_ROOT / ".env", BACKEND_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",  # ignore variables meant for other members, e.g. NEXT_PUBLIC_*
     )
