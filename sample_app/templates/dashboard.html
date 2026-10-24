@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Code Apex</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body class="dashboard-page">
+
+    <nav class="dashboard-nav">
+        <a href="/" class="brand">
+            <span class="brand-icon">C</span>
+            <span>Code<span class="brand-accent">Apex</span></span>
+        </a>
+
+        <div class="nav-links">
+            <a href="/overview-broken" class="nav-link active">Overview</a>
+            <a href="/contact" class="nav-link">Support</a>
+            <a href="/profile?email={{ email }}" class="nav-link">Profile</a>
+            <a href="/login" class="logout-link">Log out ↗</a>
+        </div>
+    </nav>
+
+    <main class="dashboard-container">
+
+        <section class="welcome-section">
+            <div>
+                <p class="eyebrow">
+                    <span class="status-dot"></span>
+                    PERSONAL WORKSPACE
+                </p>
+
+                <h1>Welcome back,<br>
+                    <span>{{ user.name }}</span>
+                </h1>
+
+                <p class="welcome-description">
+                    Your space is ready. Here's your account overview.
+                </p>
+            </div>
+
+            <div class="welcome-decoration">
+                <div class="orbit orbit-one"></div>
+                <div class="orbit orbit-two"></div>
+                <div class="orbit orbit-three"></div>
+                <div class="orbit-center">CA</div>
+            </div>
+        </section>
+
+        <section class="section-heading">
+            <div>
+                <h2>Your overview</h2>
+                <p>A quick look at your account information.</p>
+            </div>
+            <span class="overview-badge">ACCOUNT SUMMARY</span>
+        </section>
+
+        <section class="dashboard-grid">
+
+            <article class="info-card account-card">
+                <div class="card-top">
+                    <div class="card-icon purple-icon">✳</div>
+                    <span class="card-label">ACCOUNT</span>
+                </div>
+
+                <h3>Active workspace</h3>
+                <p class="card-description">
+                    You're successfully signed in to Code Apex.
+                </p>
+
+                <div class="card-footer">
+                    <span class="mini-status"></span>
+                    Session active
+                </div>
+            </article>
+
+            <article class="info-card identity-card">
+                <div class="card-top">
+                    <div class="card-icon blue-icon">◎</div>
+                    <span class="card-label">IDENTITY</span>
+                </div>
+
+                <h3>{{ user.name }}</h3>
+                <p class="card-description">Your registered username</p>
+
+                <div class="card-footer">
+                    <span class="footer-symbol">↗</span>
+                    <a href="/profile?email={{ email }}">View profile</a>
+                </div>
+            </article>
+
+            <article class="info-card email-card">
+                <div class="card-top">
+                    <div class="card-icon green-icon">✉</div>
+                    <span class="card-label">EMAIL ADDRESS</span>
+                </div>
+
+                <h3 class="email-value">{{ email }}</h3>
+                <p class="card-description">
+                    Your account's registered email address.
+                </p>
+
+                <div class="card-footer">
+                    <span class="footer-symbol">↗</span>
+                    <a href="/contact">Get support</a>
+                </div>
+            </article>
+
+        </section>
+
+        <section class="quick-access">
+            <div class="quick-access-text">
+                <div class="quick-icon">✦</div>
+                <div>
+                    <h2>Need a hand?</h2>
+                    <p>Visit our contact page if you need help with your account.</p>
+                </div>
+            </div>
+
+            <a href="/contact" class="support-button">
+                Contact support <span>→</span>
+            </a>
+        </section>
+
+        <footer class="dashboard-footer">
+            <span>© Code Apex</span>
+            <span>BUILT FOR A BETTER EXPERIENCE <span class="footer-star">✦</span></span>
+        </footer>
+
+    </main>
+
+</body>
+
+</html>
