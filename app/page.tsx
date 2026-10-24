@@ -1,13 +1,8 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 export default function Home() {
-  const initialized = useRef(false);
-
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     // Helper functions
     const $ = (s: string) => document.querySelector(s) as HTMLElement | null;
     const $$ = (s: string) => [...document.querySelectorAll(s)] as HTMLElement[];
@@ -249,6 +244,14 @@ export default function Home() {
         e: "Sign-up is rejected as too weak.",
         a: "The account is created.",
       },
+      {
+        s: "high",
+        t: "Coding answer is lost when switching questions",
+        c: "coding_state",
+        st: ["Open CODE-01", "Enter code", "Navigate to CODE-02", "Return to CODE-01"],
+        e: "The code editor restores the saved answer.",
+        a: "The editor is empty after returning.",
+      },
     ];
 
     const bugsEl = $("#bugs");
@@ -297,9 +300,9 @@ export default function Home() {
     );
 
     const RUNS = [
-      ["qa-sample-app.onrender.com", "p-c", "Completed", 4, "2m 30s"],
-      ["shop.example.com/checkout", "p-t", "Testing", 1, "1m 12s"],
-      ["app.example.io", "p-e", "Exploring", 0, "0m 34s"],
+      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 18s"],
+      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 06s"],
+      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 22s"],
       ["staging.example.dev", "p-q", "Queued", "–", "–"],
     ];
     const rowsEl = $("#rows");
@@ -546,7 +549,7 @@ export default function Home() {
                 placeholder="https://your-web-app.com — enter target URL to dispatch QA agents"
               />
               <button className="go" id="go">
-                Launch QA Swarm ⚡
+                Launch QA Swarm
               </button>
             </div>
             <div className="pills">
@@ -646,11 +649,11 @@ export default function Home() {
             <div className="col">
               <div className="kpis">
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
-                  <p>Journeys discovered</p>
+                  <p>Questions covered</p>
                   <strong>
-                    <span data-n="14">14</span>
+                    <span data-n="6">6</span><span className="kpi-denom"> / 6</span>
                   </strong>
-                  <small>Mapped paths</small>
+                  <small>MCQ 4 · Coding 2</small>
                   <div className="dots">
                     <i />
                     <i />
@@ -662,9 +665,9 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
-                  <p>Autonomous tests executed</p>
+                  <p>Scenarios executed</p>
                   <strong>
-                    <span data-n="48">48</span>
+                    <span data-n="9">9</span>
                   </strong>
                   <small>Total · 96% pass rate</small>
                   <div className="bar">
@@ -672,24 +675,21 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
-                  <p>Bugs caught</p>
+                  <p>Planted bugs detected</p>
                   <strong>
-                    <span data-n="4">4</span>
+                    <span data-n="5">5</span>
                   </strong>
                   <div className="chips">
-                    <span className="chip sev-critical">3 critical</span>
-                    <span className="chip sev-high">1 high</span>
+                    <span className="chip sev-critical">3 MCQ</span>
+                    <span className="chip sev-high">2 coding</span>
                   </div>
                 </div>
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
-                  <p>Agent confidence score</p>
+                  <p>QA health verdict</p>
                   <strong>
-                    <span data-n="98.4" data-d="1">
-                      98.4
-                    </span>
-                    %
+                    <span className="verdict-fail">FAIL</span>
                   </strong>
-                  <small>AI accuracy</small>
+                  <small>High-severity findings require fixes</small>
                   <svg className="gauge" width="44" height="44" viewBox="0 0 44 44">
                     <circle cx="22" cy="22" r="18" fill="none" stroke="var(--card2)" strokeWidth="5" />
                     <circle
@@ -716,13 +716,61 @@ export default function Home() {
                       Journeys
                     </button>
                   </div>
-                  <small id="cnt">4 found</small>
+                  <small id="cnt">5 found</small>
                 </div>
                 <div className="list" id="bugs" />
                 <div className="list" id="jr" hidden />
               </section>
             </div>
           </div>
+
+          <section className="assessment-grid" aria-label="Assessment QA overview">
+            <section className="card assessment-overview">
+              <div className="hd">Assessment overview <small>sample assessment</small></div>
+              <div className="assessment-body">
+                <div><span className="metric-label">Lifecycle</span><strong>Assessment → Section → Question → Answer → Result</strong></div>
+                <div><span className="metric-label">Question mix</span><strong>4 MCQ · 2 Coding</strong></div>
+                <div><span className="metric-label">Planted defects</span><strong>5 total · 3 MCQ · 2 Coding</strong></div>
+                <div><span className="metric-label">Run protocol</span><strong>3 bug runs + 1 clean control</strong></div>
+              </div>
+            </section>
+            <section className="card coverage-panel">
+              <div className="hd">Question coverage <small>6 / 6 exercised</small></div>
+              <div className="coverage-grid">
+                {['MCQ-01','MCQ-02','MCQ-03','MCQ-04','CODE-01','CODE-02'].map((q) => <span key={q} className="coverage-cell done">{q}<b>✓</b></span>)}
+              </div>
+            </section>
+            <section className="card coverage-panel">
+              <div className="hd">State coverage <small>80% target</small></div>
+              <div className="state-matrix">
+                {['unvisited','active','answered','marked','skipped','submitted'].map((state, i) => <span key={state} className={i === 4 ? 'state-cell partial' : 'state-cell'}><b>{state}</b><small>{i === 4 ? '3 / 6' : '6 / 6'}</small></span>)}
+              </div>
+            </section>
+            <section className="card execution-panel">
+              <div className="hd">Execution results <small>9 scenarios</small></div>
+              <div className="result-list">
+                <div><span>Navigation &amp; timer</span><b className="result-pass">PASS</b></div>
+                <div><span>MCQ answer persistence</span><b className="result-fail">FAIL · 2</b></div>
+                <div><span>Coding editor &amp; submit</span><b className="result-fail">FAIL · 2</b></div>
+                <div><span>Clean control run</span><b className="result-pass">PASS · 0 bugs</b></div>
+              </div>
+            </section>
+            <section className="card evidence-panel">
+              <div className="hd">Evidence viewer <small>5 bundles attached</small></div>
+              <div className="evidence-strip">
+                <div className="evidence-thumb"><span>MCQ-02</span><b>Screenshot</b></div>
+                <div className="evidence-thumb"><span>MCQ-04</span><b>DOM + trace</b></div>
+                <div className="evidence-thumb"><span>CODE-01</span><b>Console log</b></div>
+                <div className="evidence-thumb"><span>CODE-02</span><b>Screenshot</b></div>
+              </div>
+            </section>
+            <section className="card benchmark-panel">
+              <div className="hd">Benchmark <small>score.py protocol</small></div>
+              <div className="benchmark-score"><strong>5 / 5</strong><span>planted bugs matched</span><b className="result-pass">CONTROL: 0 reports</b></div>
+              <div className="benchmark-bars"><span style={{ width: '100%' }} /><span style={{ width: '80%' }} /></div>
+              <div className="benchmark-labels"><small>Scenario 100%</small><small>State 80%</small></div>
+            </section>
+          </section>
 
           <section className="card runs">
             <div className="hd">
@@ -749,3 +797,4 @@ export default function Home() {
     </>
   );
 }
+

@@ -29,7 +29,7 @@ export default function AmbientBackground() {
     size();
     window.addEventListener("resize", size);
 
-    const C1 = "#FF6A00";
+    const C1 = "#2563eb";
     const C2 = "#000000";
     const K = 0.8;
     const T0 = performance.now();

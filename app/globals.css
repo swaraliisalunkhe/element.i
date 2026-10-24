@@ -55,6 +55,12 @@ body {
   height: 100%;
   z-index: 0;
   pointer-events: none;
+  transition: opacity .9s ease;
+  animation: graphics-fade .9s ease 1.4s forwards;
+}
+
+@keyframes graphics-fade {
+  to { opacity: .2; }
 }
 
 .gl {
@@ -72,7 +78,6 @@ body {
   z-index: 0;
   will-change: transform;
 }
-
 .wrap {
   position: relative;
   z-index: 1;
@@ -214,9 +219,9 @@ select {
   padding: 10px 10px 10px 18px;
   border-radius: 18px;
   background: var(--card);
-  border: 1px solid var(--cy);
+  border: 1px solid var(--bd);
   backdrop-filter: blur(16px);
-  box-shadow: 0 0 0 4px var(--glow), var(--sh);
+  box-shadow: var(--sh);
 }
 .omni::before {
   content: "";
@@ -225,13 +230,14 @@ select {
   border-radius: 30px;
   background: var(--grad);
   filter: blur(30px);
-  opacity: .28;
+  opacity: 0;
   z-index: -1;
-  animation: pulse 3.2s ease-in-out infinite;
+  animation: none;
 }
 .omni:focus-within {
-  box-shadow: 0 0 0 4px var(--glow), 0 0 0 9px var(--glow2), var(--sh);
+  box-shadow: var(--sh);
 }
+
 @keyframes pulse {
   50% { opacity: .5; transform: scale(1.015); }
 }
@@ -923,6 +929,47 @@ td.sel {
 .p-c { color: var(--em); border-color: var(--em); }
 .p-q b, .p-c b { animation: none; }
 
+/* Assessment QA dashboard surfaces. The animated canvas and hero remain untouched. */
+.assessment-grid {
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+.assessment-grid > .card { min-width: 0; }
+.assessment-overview { grid-row: span 2; }
+.assessment-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 18px 18px; }
+.assessment-body > div { display: grid; gap: 3px; padding: 11px 12px; border: 1px solid var(--bd); border-radius: 10px; background: var(--card2); }
+.metric-label { color: var(--mu); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.assessment-body strong { font-size: 13px; font-weight: 500; }
+.kpi-denom { color: var(--mu); font-size: 18px; font-weight: 400; }
+.verdict-fail, .result-fail { color: var(--cr); }
+.coverage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
+.coverage-cell, .state-cell { border: 1px solid var(--bd); border-radius: 9px; background: var(--card2); padding: 9px 10px; font: 11px 'JetBrains Mono', monospace; }
+.coverage-cell { display: flex; justify-content: space-between; align-items: center; }
+.coverage-cell b, .result-pass { color: var(--em); }
+.state-matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
+.state-cell { display: grid; gap: 3px; font-family: inherit; }
+.state-cell b { font-size: 12px; font-weight: 500; }
+.state-cell small { color: var(--mu); }
+.state-cell.partial { border-color: var(--cy); }
+.result-list { display: grid; gap: 0; padding: 4px 14px 10px; }
+.result-list > div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--bd); font-size: 13px; }
+.result-list > div:last-child { border-bottom: 0; }
+.result-list b { font-size: 11px; letter-spacing: .05em; }
+.evidence-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 14px; }
+.evidence-thumb { min-height: 68px; display: grid; align-content: end; gap: 3px; padding: 8px; border: 1px solid var(--bd); border-radius: 9px; background: linear-gradient(145deg, var(--card2), var(--glow2)); }
+.evidence-thumb span { color: var(--cy); font: 11px 'JetBrains Mono', monospace; }
+.evidence-thumb b { font-size: 11px; font-weight: 500; }
+.benchmark-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; padding: 14px 18px 8px; }
+.benchmark-score strong { font-size: 30px; letter-spacing: -.03em; }
+.benchmark-score span { color: var(--mu); font-size: 13px; }
+.benchmark-score b { flex-basis: 100%; font-size: 11px; letter-spacing: .06em; }
+.benchmark-bars { display: grid; gap: 7px; padding: 4px 18px 0; }
+.benchmark-bars span { display: block; height: 6px; border-radius: 4px; background: var(--cy); }
+.benchmark-bars span:last-child { opacity: .55; }
+.benchmark-labels { display: flex; justify-content: space-between; padding: 7px 18px 14px; color: var(--mu); }
+
 .foot {
   margin: 22px 0 0;
   text-align: center;
@@ -938,6 +985,8 @@ td.sel {
   .go {
     padding: 12px 16px;
   }
+  .assessment-grid { grid-template-columns: 1fr; }
+  .assessment-overview { grid-row: auto; }
 }
 @media (max-width: 640px) {
   .wrap {
@@ -956,6 +1005,8 @@ td.sel {
   .kpis {
     grid-template-columns: 1fr;
   }
+  .assessment-body { grid-template-columns: 1fr; }
+  .evidence-strip { grid-template-columns: repeat(2, 1fr); }
   .stage {
     aspect-ratio: 4/3;
   }
@@ -972,3 +1023,4 @@ body.still * {
   animation-iteration-count: 1 !important;
   transition-duration: .01s !important;
 }
+
