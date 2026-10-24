@@ -1,391 +1,184 @@
 "use client";
-import { useMemo, useState } from "react";
-import type { AgentEvent, AgentName, Run, TestWithResult } from "@/lib/types";
-import { evidenceSrc } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AgentEvent, Run } from "@/lib/types";
 
 interface LiveViewportProps {
-  run: Run;
+  run?: Run | null;
   latestEvent?: AgentEvent;
-  events: AgentEvent[];
-  tests: TestWithResult[];
-  live: boolean;
+  events?: AgentEvent[];
+  live?: boolean;
+  targetUrl?: string;
+  isInteractiveRun?: boolean;
 }
 
-interface StepSimState {
-  url: string;
-  pageTitle: string;
-  activeSelector?: string;
-  actionText?: string;
-  cursorPos?: { x: number; y: number };
-  cursorVisible: boolean;
-  fieldEmailValue: string;
-  fieldPasswordValue: string;
-  pageRoute: "home" | "login" | "dashboard";
-  isBugTriggered?: boolean;
-}
+export default function LiveViewport({
+  run,
+  latestEvent,
+  events = [],
+  live = true,
+  targetUrl,
+  isInteractiveRun = false,
+}: LiveViewportProps) {
+  const urlDisplay = (targetUrl ?? run?.target_url ?? "https://qa-sample-app.onrender.com").replace(/\/$/, "") + "/login";
 
-export default function LiveViewport({ run, latestEvent, events, tests, live }: LiveViewportProps) {
-  const [viewMode, setViewMode] = useState<"agent" | "iframe">("agent");
-  const [copied, setCopied] = useState(false);
+  const [emailText, setEmailText] = useState("");
+  const [passwordText, setPasswordText] = useState("");
+  const [isDone, setIsDone] = useState(false);
+  const [alertOn, setAlertOn] = useState(false);
+  const [bbox, setBbox] = useState<{ on: boolean; bad: boolean; selector: string; style: React.CSSProperties }>({
+    on: false,
+    bad: false,
+    selector: "",
+    style: {},
+  });
+  const [aiPos, setAiPos] = useState({ x: 20, y: 20, click: false });
 
-  // Determine current active agent
-  const currentAgent: AgentName = latestEvent?.agent ?? "orchestrator";
+  const stageRef = useRef<HTMLDivElement>(null);
 
-  // Derive simulation state from incoming events / latest test steps
-  const simState = useMemo<StepSimState>(() => {
-    const seq = latestEvent?.seq ?? 0;
-    const targetUrl = run.target_url.replace(/\/$/, "");
+  // Sync with live event stream or sequence
+  const seq = latestEvent?.seq ?? (events.length > 0 ? events[events.length - 1].seq : 0);
 
-    // Determine current phase based on event sequence or type
+  useEffect(() => {
     if (seq >= 5 || latestEvent?.type === "bug_reported" || latestEvent?.type === "run_completed") {
-      return {
-        url: `${targetUrl}/dashboard`,
-        pageTitle: "Dashboard (Unauthorized Access)",
-        activeSelector: "#error-message",
-        actionText: "Assert failed: Expected validation error, but page redirected to /dashboard",
-        cursorPos: { x: 50, y: 35 },
-        cursorVisible: true,
-        fieldEmailValue: "user@example.com",
-        fieldPasswordValue: "",
-        pageRoute: "dashboard",
-        isBugTriggered: true,
-      };
+      setIsDone(true);
+      setAlertOn(true);
+      setBbox({
+        on: true,
+        bad: true,
+        selector: "#error-message",
+        style: { left: "20%", top: "30%", width: "60%", height: "45%" },
+      });
+      setAiPos({ x: 190, y: 120, click: false });
+      return;
     }
 
     if (seq === 4 || latestEvent?.type === "test_completed") {
-      return {
-        url: `${targetUrl}/login`,
-        pageTitle: "Log In - Submitting form",
-        activeSelector: "button[type='submit']",
-        actionText: "Clicking 'Sign in' with empty password field",
-        cursorPos: { x: 50, y: 68 },
-        cursorVisible: true,
-        fieldEmailValue: "user@example.com",
-        fieldPasswordValue: "",
-        pageRoute: "login",
-        isBugTriggered: false,
-      };
+      setEmailText("user@example.com");
+      setPasswordText("");
+      setIsDone(true);
+      setAlertOn(true);
+      setBbox({
+        on: true,
+        bad: true,
+        selector: "button[type='submit']",
+        style: { left: "30%", top: "58%", width: "40%", height: "34px" },
+      });
+      setAiPos({ x: 170, y: 145, click: true });
+      return;
     }
 
-    if (seq === 3 || latestEvent?.message?.toLowerCase().includes("tester")) {
-      return {
-        url: `${targetUrl}/login`,
-        pageTitle: "Log In - Entering Credentials",
-        activeSelector: "#email",
-        actionText: "Typing into #email: 'user@example.com'",
-        cursorPos: { x: 50, y: 45 },
-        cursorVisible: true,
-        fieldEmailValue: "user@example.com",
-        fieldPasswordValue: "",
-        pageRoute: "login",
-        isBugTriggered: false,
-      };
+    if (seq === 3 || latestEvent?.agent === "tester") {
+      setEmailText("user@example.com");
+      setPasswordText("");
+      setIsDone(false);
+      setAlertOn(false);
+      setBbox({
+        on: true,
+        bad: false,
+        selector: "#email",
+        style: { left: "30%", top: "32%", width: "40%", height: "30px" },
+      });
+      setAiPos({ x: 165, y: 88, click: false });
+      return;
     }
 
-    if (seq === 2 || latestEvent?.type === "journey_discovered") {
-      return {
-        url: `${targetUrl}/login`,
-        pageTitle: "Log In Page - Mapping Elements",
-        activeSelector: "#email",
-        actionText: "Explorer mapping DOM elements: #email, #password, submit button",
-        cursorPos: { x: 48, y: 40 },
-        cursorVisible: true,
-        fieldEmailValue: "",
-        fieldPasswordValue: "",
-        pageRoute: "login",
-        isBugTriggered: false,
-      };
+    if (seq >= 1) {
+      setEmailText("");
+      setPasswordText("");
+      setIsDone(false);
+      setAlertOn(false);
+      setBbox({
+        on: true,
+        bad: false,
+        selector: "#email",
+        style: { left: "30%", top: "32%", width: "40%", height: "30px" },
+      });
+      setAiPos({ x: 120, y: 50, click: false });
+      return;
     }
 
-    if (seq >= 1 || latestEvent?.type === "agent_started") {
-      return {
-        url: `${targetUrl}/`,
-        pageTitle: "Home Page - Autonomous Crawl",
-        activeSelector: "a[href='/login']",
-        actionText: "Navigating to home page & discovering navigation links",
-        cursorPos: { x: 80, y: 15 },
-        cursorVisible: true,
-        fieldEmailValue: "",
-        fieldPasswordValue: "",
-        pageRoute: "home",
-        isBugTriggered: false,
-      };
-    }
-
-    // Default initial state
-    return {
-      url: targetUrl,
-      pageTitle: "Connecting to target application...",
-      activeSelector: undefined,
-      actionText: "Initializing QA agent session...",
-      cursorPos: { x: 50, y: 50 },
-      cursorVisible: false,
-      fieldEmailValue: "",
-      fieldPasswordValue: "",
-      pageRoute: "home",
-      isBugTriggered: false,
-    };
-  }, [latestEvent, run.target_url]);
-
-  // Check if there is an image snapshot available in the latest test or evidence
-  const latestScreenshot = useMemo(() => {
-    for (let i = tests.length - 1; i >= 0; i--) {
-      const shot = tests[i].result?.evidence.find((e) => e.kind === "screenshot");
-      if (shot) return evidenceSrc(shot.url);
-    }
-    // Also check event data if real backend provided one
-    if (latestEvent?.data && typeof latestEvent.data === "object") {
-      const d = latestEvent.data as Record<string, unknown>;
-      if (typeof d.screenshot_url === "string") return evidenceSrc(d.screenshot_url);
-    }
-    return null;
-  }, [tests, latestEvent]);
-
-  function copyUrl() {
-    navigator.clipboard.writeText(simState.url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
+    // Default reset
+    setEmailText("");
+    setPasswordText("");
+    setIsDone(false);
+    setAlertOn(false);
+    setBbox({ on: false, bad: false, selector: "", style: {} });
+    setAiPos({ x: 20, y: 20, click: false });
+  }, [seq, latestEvent]);
 
   return (
-    <div className="panel viewport-panel">
-      {/* Browser Window Chrome Top Header */}
-      <div className="viewport-header">
-        <div className="browser-window-dots" aria-hidden="true">
-          <span className="dot dot-close" />
-          <span className="dot dot-minimize" />
-          <span className="dot dot-expand" />
+    <section className="card">
+      <div className="chrome">
+        <i />
+        <i />
+        <i />
+        <div className="addr">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 10V8a5 5 0 0110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9a1 1 0 011-1h1zm2 0h6V8a3 3 0 00-6 0v2z" />
+          </svg>
+          <span id="addr">{urlDisplay}</span>
         </div>
-
-        {/* Browser Address Bar */}
-        <div className="browser-address-bar">
-          <span className="ssl-lock" title="Connection encrypted">🔒</span>
-          <span className="browser-url-text" title={simState.url}>{simState.url}</span>
-          <button
-            type="button"
-            className="browser-icon-btn"
-            onClick={copyUrl}
-            title={copied ? "Copied!" : "Copy URL"}
-          >
-            {copied ? "✓" : "📋"}
-          </button>
-          <a
-            href={simState.url}
-            target="_blank"
-            rel="noreferrer"
-            className="browser-icon-btn"
-            title="Open website in new browser tab"
-          >
-            ↗
-          </a>
-        </div>
-
-        {/* Viewport Meta & Mode Selector */}
-        <div className="viewport-header-actions">
-          <span className="viewport-dimensions">1280 × 720</span>
-          <div className="viewport-toggle-group">
-            <button
-              type="button"
-              className={`chip ${viewMode === "agent" ? "on" : ""}`}
-              onClick={() => setViewMode("agent")}
-              title="View the AI Agent's active screen and cursor"
-            >
-              Agent View
-            </button>
-            <button
-              type="button"
-              className={`chip ${viewMode === "iframe" ? "on" : ""}`}
-              onClick={() => setViewMode("iframe")}
-              title="Direct embedded web frame"
-            >
-              Direct Frame
-            </button>
-          </div>
-        </div>
+        <span className="radar">
+          <b />
+          {live ? "LIVE" : "DONE"}
+        </span>
       </div>
 
-      {/* Active Agent & Action Spotlight Banner */}
-      <div className={`agent-activity-banner agent-${currentAgent}`}>
-        <div className="activity-left">
-          <span className={`live-radar-dot ${live ? "pulse" : "idle"}`} />
-          <span className="agent-tag">
-            <strong>{currentAgent.toUpperCase()}</strong>: {simState.pageTitle}
-          </span>
+      <div className={`stage ${isDone ? "done" : ""}`} id="stage" ref={stageRef}>
+        <div className="nav">
+          <b />
+          <span />
+          <span />
+          <span />
         </div>
-        <div className="activity-right">
-          <span className="action-pill">{simState.actionText}</span>
-        </div>
-      </div>
 
-      {/* Main Viewport Content Screen */}
-      <div className="viewport-screen">
-        {viewMode === "iframe" ? (
-          <div className="iframe-container">
-            <iframe
-              src={simState.url}
-              title="Live Target Website"
-              className="live-iframe"
-              sandbox="allow-scripts allow-forms allow-same-origin"
-            />
-            <div className="iframe-notice">
-              <span>Note: Sites with strict <code>X-Frame-Options</code> may block framing.</span>
-              <a href={simState.url} target="_blank" rel="noreferrer" className="btn-link">
-                Open in new tab ↗
-              </a>
+        <div className="site">
+          <div className="form">
+            <h4>Welcome back</h4>
+            <label>Email</label>
+            <div className="fld" id="email">
+              {emailText}
+            </div>
+            <label>Password</label>
+            <div className="fld" id="password">
+              {passwordText}
+            </div>
+            <div className="sbtn" id="submit">
+              Sign in
             </div>
           </div>
-        ) : (
-          /* Agent View: Visual target webpage representation with interactive AI cursor */
-          <div className="agent-canvas-stage">
-            {/* Virtual Website Stage Mockup */}
-            <div className="simulated-website">
-              <nav className="sim-navbar">
-                <div className="sim-logo">QA Target Web App</div>
-                <div className="sim-nav-links">
-                  <span className={`sim-link ${simState.pageRoute === "home" ? "active" : ""}`}>Home</span>
-                  <span className={`sim-link ${simState.pageRoute === "login" ? "active" : ""}`}>Login</span>
-                  <span className={`sim-link ${simState.pageRoute === "dashboard" ? "active" : ""}`}>Dashboard</span>
-                </div>
-              </nav>
 
-              <div className="sim-content">
-                {simState.pageRoute === "home" && (
-                  <div className="sim-hero">
-                    <h2>Welcome to the Sample Application</h2>
-                    <p>This is the initial landing page being mapped by the autonomous Explorer agent.</p>
-                    <div className={`sim-callout ${simState.activeSelector === "a[href='/login']" ? "highlight-target" : ""}`}>
-                      <span className="sim-btn">Go to Login Page →</span>
-                    </div>
-                  </div>
-                )}
-
-                {simState.pageRoute === "login" && (
-                  <div className="sim-login-card">
-                    <h3>Account Sign In</h3>
-                    <p className="muted small">Please enter your credentials to proceed.</p>
-
-                    <div className={`sim-field ${simState.activeSelector === "#email" ? "highlight-target" : ""}`}>
-                      <label htmlFor="sim-email">Email Address <span className="req">*</span></label>
-                      <input
-                        id="sim-email"
-                        type="text"
-                        readOnly
-                        value={simState.fieldEmailValue}
-                        placeholder="user@example.com"
-                        className="sim-input"
-                      />
-                      {simState.activeSelector === "#email" && (
-                        <span className="selector-tag">#email [active target]</span>
-                      )}
-                    </div>
-
-                    <div className={`sim-field ${simState.activeSelector === "#password" ? "highlight-target" : ""}`}>
-                      <label htmlFor="sim-password">Password <span className="req">*</span></label>
-                      <input
-                        id="sim-password"
-                        type="password"
-                        readOnly
-                        value={simState.fieldPasswordValue}
-                        placeholder="(left blank by tester)"
-                        className="sim-input"
-                      />
-                    </div>
-
-                    <div className={`sim-field ${simState.activeSelector === "button[type='submit']" ? "highlight-target" : ""}`}>
-                      <button type="button" className="sim-submit-btn">
-                        Sign In
-                      </button>
-                      {simState.activeSelector === "button[type='submit']" && (
-                        <span className="selector-tag">button[type=&apos;submit&apos;]</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {simState.pageRoute === "dashboard" && (
-                  <div className="sim-dashboard">
-                    <div className="sim-bug-alert" role="alert">
-                      <div className="alert-icon">⚠️</div>
-                      <div>
-                        <strong>BUG DETECTED: Missing Form Validation</strong>
-                        <p>User bypassed password validation and entered the private dashboard!</p>
-                      </div>
-                    </div>
-
-                    <div className="sim-welcome-box">
-                      <h3>User Dashboard</h3>
-                      <p className="muted">Logged in as: <code>user@example.com</code></p>
-                      <div className="sim-card-grid">
-                        <div className="sim-tile"><strong>Profile</strong><p>Status: Active</p></div>
-                        <div className="sim-tile"><strong>Session</strong><p>Token: Valid</p></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Simulated AI Virtual Cursor Overlay */}
-            {simState.cursorVisible && simState.cursorPos && (
-              <div
-                className="ai-virtual-cursor"
-                style={{
-                  left: `${simState.cursorPos.x}%`,
-                  top: `${simState.cursorPos.y}%`,
-                }}
-              >
-                <svg className="cursor-arrow" viewBox="0 0 24 24" width="22" height="22">
-                  <path
-                    fill="currentColor"
-                    stroke="#ffffff"
-                    strokeWidth="1.5"
-                    d="M3 3l7 18 3-7 7-3L3 3z"
-                  />
-                </svg>
-                <span className="cursor-agent-label">
-                  {currentAgent}
-                </span>
-                <span className="cursor-pulse-wave" />
-              </div>
-            )}
-
-            {/* If a real screenshot or test evidence exists, show a quick snapshot preview thumbnail toggle */}
-            {latestScreenshot && (
-              <div className="evidence-overlay-dock">
-                <span className="dock-label">Latest Evidence Capture:</span>
-                <a
-                  href={latestScreenshot}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="dock-thumb-link"
-                  title="Click to view full resolution evidence"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={latestScreenshot} alt="Latest test failure capture" />
-                  <span className="zoom-hint">🔍 Expand</span>
-                </a>
-              </div>
-            )}
+          <div className="welcome">
+            <h4>Dashboard</h4>
+            <p id="who">Welcome, user@example.com</p>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Viewport Footer Bar */}
-      <div className="viewport-footer">
-        <div className="viewport-footer-stat">
-          <span className="muted small">Target:</span>
-          <strong>{run.target_url}</strong>
-        </div>
-        <div className="viewport-footer-stat">
-          <span className="muted small">Events Processed:</span>
-          <strong>{events.length}</strong>
-        </div>
-        <div className="viewport-footer-stat">
-          <span className="muted small">Active Selector:</span>
-          <code>{simState.activeSelector ?? "none"}</code>
+        {/* Animated Bounding Box */}
+        <div
+          className={`bbox ${bbox.on ? "on" : ""} ${bbox.bad ? "bad" : ""}`}
+          id="bb"
+          style={bbox.style}
+          data-s={bbox.selector}
+        />
+
+        {/* Floating AI Virtual Cursor */}
+        <svg
+          className={`ai ${aiPos.click ? "click" : ""}`}
+          id="ai"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          style={{ transform: `translate(${aiPos.x}px, ${aiPos.y}px)` }}
+        >
+          <path d="M3 2l7 19 3-8 8-3z" />
+        </svg>
+
+        {/* Critical Alert Banner */}
+        <div className={`alert ${alertOn ? "on" : ""}`} id="al">
+          <b>Critical</b>
+          <span>Login accepted an empty password and opened the dashboard.</span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

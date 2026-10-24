@@ -4,58 +4,163 @@ import { useRouter } from "next/navigation";
 import { createRun } from "@/lib/api";
 import type { AgentMode, RunCreate } from "@/lib/types";
 
-export default function RunForm() {
+interface RunFormProps {
+  onLaunch?: (url: string, mode: AgentMode, depth: number, pages: number) => void;
+  initialUrl?: string;
+}
+
+export default function RunForm({ onLaunch, initialUrl }: RunFormProps) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("https://qa-sample-app.onrender.com");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [mode, setMode] = useState<AgentMode>("mock");
-  const [maxPages, setMaxPages] = useState("10");
-  const [maxDepth, setMaxDepth] = useState("2");
-  const [maxTests, setMaxTests] = useState("20");
+  const [maxDepth, setMaxDepth] = useState(2);
+  const [maxPages, setMaxPages] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inRange = (v: string, lo: number, hi: number) => /^\d+$/.test(v) && +v >= lo && +v <= hi;
+  function adjustDepth(delta: number) {
+    setMaxDepth((prev) => Math.max(1, Math.min(5, prev + delta)));
+  }
 
-  async function start() {
+  function adjustPages(delta: number) {
+    setMaxPages((prev) => Math.max(1, Math.min(50, prev + delta)));
+  }
+
+  async function handleLaunch() {
     setError(null);
-    if (!/^https?:\/\//.test(url)) return setError("Enter a full URL starting with http:// or https://");
-    if (!inRange(maxPages, 1, 50)) return setError("Max pages must be between 1 and 50.");
-    if (!inRange(maxDepth, 1, 5)) return setError("Max depth must be between 1 and 5.");
-    if (!inRange(maxTests, 1, 100)) return setError("Max tests must be between 1 and 100.");
-    const payload: RunCreate = {
-      target_url: url, agent_mode: mode,
-      max_pages: +maxPages, max_depth: +maxDepth, max_tests: +maxTests,
-    };
-    if (name.trim()) payload.name = name.trim();
+    const target = url.trim() || "https://qa-sample-app.onrender.com";
+
+    if (!/^https?:\/\/\S+\.\S+/.test(target)) {
+      setError("Enter a full URL starting with http:// or https://");
+      return;
+    }
+
+    if (onLaunch) {
+      onLaunch(target, mode, maxDepth, maxPages);
+      return;
+    }
+
     setBusy(true);
+    const payload: RunCreate = {
+      target_url: target,
+      agent_mode: mode,
+      max_depth: maxDepth,
+      max_pages: maxPages,
+      max_tests: 20,
+    };
+
     try {
       const run = await createRun(payload);
       router.push(`/runs/${run.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start the run.");
+      setError(e instanceof Error ? e.message : "Could not launch QA Swarm.");
       setBusy(false);
     }
   }
 
   return (
-    <div className="panel stack">
-      <label className="field"><span>App URL</span>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-app.example" /></label>
-      <label className="field"><span>Run name (optional)</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Smoke run on sample app" /></label>
-      <label className="field"><span>Agent mode</span>
-        <select value={mode} onChange={(e) => setMode(e.target.value as AgentMode)}>
-          <option value="mock">Mock (generated fixtures, no real browser)</option>
-          <option value="real">Real (agents drive a browser)</option>
-        </select></label>
-      <div className="three-col">
-        <label className="field"><span>Max pages (1-50)</span><input inputMode="numeric" value={maxPages} onChange={(e) => setMaxPages(e.target.value)} /></label>
-        <label className="field"><span>Max depth (1-5)</span><input inputMode="numeric" value={maxDepth} onChange={(e) => setMaxDepth(e.target.value)} /></label>
-        <label className="field"><span>Max tests (1-100)</span><input inputMode="numeric" value={maxTests} onChange={(e) => setMaxTests(e.target.value)} /></label>
+    <div className="console">
+      <div className="omni">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" />
+        </svg>
+
+        <input
+          id="url"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          aria-label="Target URL"
+          placeholder="https://your-web-app.com — enter target URL to dispatch QA agents"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleLaunch();
+          }}
+        />
+
+        <button
+          type="button"
+          className="go"
+          id="go"
+          onClick={handleLaunch}
+          disabled={busy}
+        >
+          {busy ? "Dispatching..." : "Launch QA Swarm ⚡"}
+        </button>
       </div>
-      {error && <p className="error" role="alert">{error}</p>}
-      <button className="primary" onClick={start} disabled={busy}>{busy ? "Starting..." : "Start test run"}</button>
+
+      <div className="pills">
+        <span className="seg" role="group" aria-label="Agent mode">
+          <button
+            type="button"
+            aria-pressed={mode === "real"}
+            onClick={() => setMode("real")}
+          >
+            Real Browser
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "mock"}
+            onClick={() => setMode("mock")}
+          >
+            Mock Agent
+          </button>
+        </span>
+
+        <span className="step">
+          Max depth{" "}
+          <button
+            type="button"
+            aria-label="Decrease depth"
+            onClick={() => adjustDepth(-1)}
+          >
+            −
+          </button>
+          <output id="depth">{maxDepth}</output>
+          <button
+            type="button"
+            aria-label="Increase depth"
+            onClick={() => adjustDepth(1)}
+          >
+            +
+          </button>
+        </span>
+
+        <span className="step">
+          Max pages{" "}
+          <button
+            type="button"
+            aria-label="Decrease pages"
+            onClick={() => adjustPages(-5)}
+          >
+            −
+          </button>
+          <output id="pages">{maxPages}</output>
+          <button
+            type="button"
+            aria-label="Increase pages"
+            onClick={() => adjustPages(5)}
+          >
+            +
+          </button>
+        </span>
+
+        {error && (
+          <p className="err" id="err" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

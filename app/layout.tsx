@@ -1,16 +1,23 @@
 import "./globals.css";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-export const metadata = { title: "Code Apex - QA dashboard", description: "Autonomous AI QA engineer" };
+export const metadata = {
+  title: "element.i – Autonomous Multi-Agent AI Quality Engineering",
+  description: "Next-generation autonomous AI QA engineer that maps, tests, and finds bugs on your web application.",
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <header className="topbar"><Link href="/">Code Apex</Link><span className="muted">Autonomous QA runs</span></header>
-        <main>{children}</main>
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

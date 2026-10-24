@@ -2,24 +2,59 @@
 import { useEffect, useRef } from "react";
 import type { AgentEvent } from "@/lib/types";
 
-export default function EventStream({ events, live, connectionLost }: { events: AgentEvent[]; live: boolean; connectionLost: boolean }) {
+interface EventStreamProps {
+  events: AgentEvent[];
+  live?: boolean;
+  connectionLost?: boolean;
+  modeLabel?: string;
+}
+
+export default function EventStream({
+  events,
+  live = true,
+  connectionLost = false,
+  modeLabel = "Real browser",
+}: EventStreamProps) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [events.length]);
+
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [events.length]);
+
   return (
-    <div className="panel stream" aria-live="polite">
-      {events.length === 0 && <p className="empty">{live ? "Waiting for the agents to report progress..." : "No events were recorded for this run."}</p>}
-      {events.map((e) => (
-        <div key={e.seq} className={`thought agent-${e.agent} level-${e.level}`}>
-          <div className="row gap">
-            <span className="badge neutral">{e.agent}</span>
-            <span className="muted small">{e.type.replace(/_/g, " ")}</span>
-            <time className="muted small">{new Date(e.timestamp).toLocaleTimeString()}</time>
+    <section className="card">
+      <div className="hd">
+        Agent thought stream <small id="modeNote">{modeLabel}</small>
+      </div>
+      <div className="feed" id="feed" aria-live="polite">
+        {events.length === 0 && (
+          <div>
+            <time>{new Date().toLocaleTimeString([], { hour12: false })}</time>
+            <span className="tag t-orchestrator">orchestrator</span>
+            <span>{live ? "Waiting for agents to dispatch..." : "No events recorded."}</span>
           </div>
-          <p>{e.message}</p>
-        </div>
-      ))}
-      {connectionLost && <p className="error">Live connection lost. Reconnecting...</p>}
-      <div ref={end} />
-    </div>
+        )}
+
+        {events.map((e) => (
+          <div key={e.id || e.seq}>
+            <time>
+              {new Date(e.timestamp).toLocaleTimeString([], { hour12: false })}
+            </time>
+            <span className={`tag t-${e.agent}`}>{e.agent}</span>
+            <span>{e.message}</span>
+          </div>
+        ))}
+
+        {live && <div className="caret" />}
+        {connectionLost && (
+          <div style={{ color: "var(--cr)" }}>
+            <time>!</time>
+            <span className="tag t-orchestrator">system</span>
+            <span>Live connection interrupted. Reconnecting...</span>
+          </div>
+        )}
+        <div ref={end} />
+      </div>
+    </section>
   );
 }
