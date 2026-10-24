@@ -37,7 +37,13 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///data/code_apex.db"
     evidence_dir: str = "data/evidence"
 
-    sample_app_url: str = "http://localhost:5000"
+    sample_app_url: str = "http://localhost:8001"
+    target_reset_path: str = "/reset"
+    sample_assessment_duration: int = 300
+    testsuite_max_cases: int = 25
+    trace_enabled: bool = True
+    headless: bool = True
+    llm_model: str = ""
 
     llm_provider: LLMProvider = LLMProvider.NONE
     gemini_api_key: SecretStr = SecretStr("")

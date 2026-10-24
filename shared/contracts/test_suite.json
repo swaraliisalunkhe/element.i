@@ -1,0 +1,15 @@
+{
+  "id": "ts_1a2b3c4d5e6f",
+  "run_id": "run_7f3a9c21b4d8",
+  "source": "llm",
+  "generated_by": { "provider": "gemini", "model": "example-model" },
+  "prompt_version": "testgen-v1",
+  "coverage_targets": [
+    { "question_id": "q2", "scenario": "answer_persistence" },
+    { "question_type": "mcq", "scenario": "skip_review" },
+    { "question_id": "q5", "scenario": "coding_behavior" }
+  ],
+  "test_case_ids": ["tc_a11ce0000001", "tc_a11ce0000002", "tc_a11ce0000003"],
+  "validation": { "status": "valid", "repaired": false, "dropped_cases": 1 },
+  "created_at": "2026-10-17T10:00:50Z"
+}

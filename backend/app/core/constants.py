@@ -8,7 +8,7 @@ Adding a new value is allowed only through a PR that all members approve.
 
 from enum import StrEnum
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 API_PREFIX = "/api"
 EVIDENCE_URL_PREFIX = "/api/evidence"
 
@@ -67,6 +67,13 @@ class BugCategory(StrEnum):
     CONSOLE_ERROR = "console_error"
     NETWORK_ERROR = "network_error"
 
+    VALIDATION = "validation"
+    SERVER_ERROR = "server_error"
+    UI = "ui"
+    ANSWER_STATE = "answer_state"
+    TIMER = "timer"
+    EVALUATION = "evaluation"
+
 
 class BrowserAction(StrEnum):
     """The only actions a test step may use. The Tester must support all of them."""
@@ -84,6 +91,13 @@ class BrowserAction(StrEnum):
     ASSERT_TEXT = "assert_text"
     ASSERT_URL = "assert_url"
     SCREENSHOT = "screenshot"
+
+    SUBMIT = "submit"
+    TYPE_CODE = "type_code"
+    RUN_CODE = "run_code"
+    WAIT_TIMER = "wait_timer"
+    ASSERT_STATE = "assert_state"
+    ASSERT_VALUE = "assert_value"
 
 
 class AgentName(StrEnum):
@@ -125,6 +139,9 @@ class EvidenceKind(StrEnum):
     CONSOLE_LOG = "console_log"
     HTML_SNAPSHOT = "html_snapshot"
 
+    NETWORK_LOG = "network_log"
+    TRACE = "trace"
+    DOM_SNAPSHOT = "dom_snapshot"
 
 class EventType(StrEnum):
     """Names of the live events sent over SSE. See Part 4 for how they are used."""
@@ -170,3 +187,53 @@ class LLMProvider(StrEnum):
     GEMINI = "gemini"
     CLAUDE = "claude"
     NONE = "none"
+
+class RunMode(StrEnum):
+    """What kind of site the run targets."""
+
+    ASSESSMENT = "assessment"   # online assessment / exam QA (default)
+    GENERIC = "generic"         # generic website crawl (fallback)
+
+
+class QuestionType(StrEnum):
+    MCQ = "mcq"
+    CODING = "coding"
+
+
+class QuestionState(StrEnum):
+    NOT_VISITED = "not_visited"
+    NOT_ANSWERED = "not_answered"
+    ANSWERED = "answered"
+    SKIPPED = "skipped"
+    MARKED_FOR_REVIEW = "marked_for_review"
+    ANSWERED_AND_MARKED = "answered_and_marked"
+
+
+class LifecycleStage(StrEnum):
+    ASSESSMENT = "assessment"
+    SECTION = "section"
+    QUESTION = "question"
+    ANSWER = "answer"
+    NAVIGATION = "navigation"
+    TIMER = "timer"
+    SUBMISSION = "submission"
+    EVALUATION = "evaluation"
+    SCORE = "score"
+    RESULT = "result"
+
+
+class ScenarioTag(StrEnum):
+    ANSWER_PERSISTENCE = "answer_persistence"
+    NAVIGATION = "navigation"
+    SKIP_REVIEW = "skip_review"
+    TIMER = "timer"
+    SUBMISSION = "submission"
+    MCQ_BEHAVIOR = "mcq_behavior"
+    CODING_BEHAVIOR = "coding_behavior"
+    EVALUATION = "evaluation"
+    NEGATIVE_EDGE = "negative_edge"
+
+
+class SuiteSource(StrEnum):
+    LLM = "llm"
+    TEMPLATE_FALLBACK = "template_fallback"
