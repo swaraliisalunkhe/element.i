@@ -21,8 +21,6 @@ services:
         value: sqlite:///data/code_apex.db
       - key: EVIDENCE_DIR
         value: data/evidence
-      - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/project/src/.ms-playwright
       - key: FRONTEND_ORIGIN
         value: https://element-i-frontend.onrender.com
       - key: SAMPLE_APP_URL

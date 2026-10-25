@@ -154,10 +154,43 @@ class BrowserDriver:
             if render_browsers.is_dir():
                 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(render_browsers)
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(
-            headless=headless,
-            args=launch_args,
-        )
+        try:
+            self._browser = await self._playwright.chromium.launch(
+                headless=headless,
+                args=launch_args,
+            )
+        except Exception as exc:
+            err_msg = str(exc)
+            if "Executable doesn't exist" in err_msg or "executable doesn't exist" in err_msg:
+                logger.warning(
+                    "Playwright Chromium executable was not found (%s). "
+                    "Running on-demand fallback: python -m playwright install chromium...",
+                    err_msg,
+                )
+                import subprocess
+                import sys
+
+                install_proc = subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if install_proc.returncode != 0:
+                    logger.error(
+                        "Fallback playwright installation failed (exit code %d):\nSTDOUT: %s\nSTDERR: %s",
+                        install_proc.returncode,
+                        install_proc.stdout,
+                        install_proc.stderr,
+                    )
+                    raise
+                logger.info("Fallback playwright chromium installation succeeded. Retrying launch...")
+                self._browser = await self._playwright.chromium.launch(
+                    headless=headless,
+                    args=launch_args,
+                )
+            else:
+                raise
         self._context = await self._browser.new_context()
         self._page = await self._context.new_page()
 
