@@ -168,7 +168,7 @@ export default function RunDetail() {
 
           {/* Right Column: KPIs & Bugs/Journeys */}
           <div className="col">
-            <KpiCards summary={run.summary} />
+            <KpiCards summary={run.summary} bugs={bugs} tests={tests} journeys={journeys} />
 
             <BugList bugs={bugs} journeys={journeys} />
           </div>

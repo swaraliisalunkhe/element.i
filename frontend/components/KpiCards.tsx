@@ -1,25 +1,39 @@
 "use client";
-import type { RunSummary } from "@/lib/types";
+import type { BugReport, Journey, RunSummary, TestWithResult } from "@/lib/types";
 
 interface KpiCardsProps {
   summary?: RunSummary | null;
+  bugs?: BugReport[];
+  tests?: TestWithResult[];
+  journeys?: Journey[];
 }
 
-export default function KpiCards({ summary }: KpiCardsProps) {
-  const journeys = summary?.journeys_count ?? 14;
-  const testsTotal = summary?.tests_total ?? 48;
-  const testsPassed = summary?.tests_passed ?? 46;
-  const bugs = summary?.bugs_count ?? 4;
-  const passRate = testsTotal > 0 ? Math.round((testsPassed / testsTotal) * 100) : 96;
+export default function KpiCards({ summary, bugs = [], tests = [], journeys = [] }: KpiCardsProps) {
+  const journeysCount = summary?.journeys_count ?? journeys.length;
+  const testsTotal = summary?.tests_total ?? tests.length;
+  const testsPassed = summary?.tests_passed ?? tests.filter((t) => t.result?.status === "passed").length;
+  const bugsCount = summary?.bugs_count ?? bugs.length;
+  const passRate = testsTotal > 0 ? Math.round((testsPassed / testsTotal) * 100) : null;
+
+  const criticalBugs = bugs.filter((b) => b.severity === "critical").length;
+  const highBugs = bugs.filter((b) => b.severity === "high").length;
+  const otherBugs = bugsCount - criticalBugs - highBugs;
+
+  const confidences = bugs
+    .map((b) => b.confidence)
+    .filter((c): c is number => typeof c === "number" && !isNaN(c));
+  const avgConfidence = confidences.length > 0
+    ? Math.round((confidences.reduce((acc, val) => acc + val, 0) / confidences.length) * 1000) / 10
+    : null;
 
   return (
     <div className="kpis">
       <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
         <p>Journeys discovered</p>
         <strong>
-          <span data-n={journeys}>{journeys}</span>
+          <span data-n={journeysCount}>{journeysCount}</span>
         </strong>
-        <small>Mapped paths</small>
+        <small>{journeysCount > 0 ? "Mapped paths" : "No journeys yet"}</small>
         <div className="dots">
           <i /><i /><i /><i /><i /><i /><i />
         </div>
@@ -30,29 +44,44 @@ export default function KpiCards({ summary }: KpiCardsProps) {
         <strong>
           <span data-n={testsTotal}>{testsTotal}</span>
         </strong>
-        <small>Total · {passRate}% pass rate</small>
+        <small>
+          {testsTotal > 0 ? `Total · ${passRate}% pass rate` : "Total · No tests run yet"}
+        </small>
         <div className="bar">
-          <i style={{ width: `${passRate}%` }} />
+          <i style={{ width: passRate !== null ? `${passRate}%` : "0%" }} />
         </div>
       </div>
 
       <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
         <p>Bugs caught</p>
         <strong>
-          <span data-n={bugs}>{bugs}</span>
+          <span data-n={bugsCount}>{bugsCount}</span>
         </strong>
         <div className="chips">
-          <span className="chip sev-critical">{bugs > 1 ? `${bugs - 1} critical` : "1 critical"}</span>
-          <span className="chip sev-high">1 high</span>
+          {bugsCount === 0 ? (
+            <small style={{ color: "var(--mu)", fontSize: "12px" }}>No bugs detected</small>
+          ) : (
+            <>
+              {criticalBugs > 0 && <span className="chip sev-critical">{criticalBugs} critical</span>}
+              {highBugs > 0 && <span className="chip sev-high">{highBugs} high</span>}
+              {otherBugs > 0 && <span className="chip sev-medium">{otherBugs} medium/low</span>}
+            </>
+          )}
         </div>
       </div>
 
       <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
         <p>Agent confidence score</p>
         <strong>
-          <span data-n="98.4">98.4</span>%
+          {avgConfidence !== null ? (
+            <>
+              <span data-n={avgConfidence}>{avgConfidence}</span>%
+            </>
+          ) : (
+            <span>No data yet</span>
+          )}
         </strong>
-        <small>AI accuracy</small>
+        <small>{avgConfidence !== null ? "Avg bug confidence" : "Awaiting test results"}</small>
         <svg className="gauge" width="44" height="44" viewBox="0 0 44 44">
           <circle cx="22" cy="22" r="18" fill="none" stroke="var(--card2)" strokeWidth="5" />
           <circle
@@ -63,7 +92,7 @@ export default function KpiCards({ summary }: KpiCardsProps) {
             stroke="var(--cy)"
             strokeWidth="5"
             strokeLinecap="round"
-            strokeDasharray="111 113"
+            strokeDasharray={`${avgConfidence !== null ? Math.round((avgConfidence / 100) * 113) : 0} 113`}
             transform="rotate(-90 22 22)"
           />
         </svg>
