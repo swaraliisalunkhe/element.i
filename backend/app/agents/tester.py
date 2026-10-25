@@ -502,10 +502,14 @@ class TesterAgent:
             page = driver.page
             if not page:
                 raise AssertionError("Browser page is not available")
-            is_visible = await page.is_visible(step.selector)
-            if not is_visible:
-                raise AssertionError(f"Element '{step.selector}' is not visible")
-            return f"Element '{step.selector}' is visible"
+            try:
+                loc = page.locator(step.selector).first
+                await loc.wait_for(state="visible", timeout=3000)
+                return f"Element '{step.selector}' is visible"
+            except Exception:
+                if await page.is_visible(step.selector):
+                    return f"Element '{step.selector}' is visible"
+                raise AssertionError(f"Element '{step.selector}' is not visible on {page.url}")
 
         if action == BrowserAction.ASSERT_TEXT:
             if not step.selector or step.value is None:

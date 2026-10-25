@@ -212,80 +212,97 @@ export default function Home() {
         "--cy"
       )}"/></svg>`;
 
-    const BUGS = [
-      {
-        s: "critical",
-        t: "Dashboard opens without logging in",
-        c: "security",
-        st: ["Open /dashboard?email=a registered email", "Do not log in first"],
-        e: "Visitor is redirected to the login page.",
-        a: "The dashboard loads with the account’s data.",
-      },
-      {
-        s: "critical",
-        t: "Login accepts an empty password",
-        c: "form_validation",
-        st: ["Open /login", "Type user@example.com into Email", "Leave Password empty", "Click Sign in"],
-        e: "Form is rejected with “Password is required”.",
-        a: "Visitor lands on /dashboard with no message.",
-      },
-      {
-        s: "critical",
-        t: "Password reset confirms but changes nothing",
-        c: "functional",
-        st: ["Open /reset-password", "Request a reset for a registered email", "Log in with a new password"],
-        e: "The new password works.",
-        a: "Only a confirmation message appears; the password never changes.",
-      },
-      {
-        s: "high",
-        t: "Weak password accepted at sign-up",
-        c: "form_validation",
-        st: ["Open /signup", "Enter a one-character password and the same confirmation", "Click Sign Up"],
-        e: "Sign-up is rejected as too weak.",
-        a: "The account is created.",
-      },
-      {
-        s: "high",
-        t: "Coding answer is lost when switching questions",
-        c: "coding_state",
-        st: ["Open CODE-01", "Enter code", "Navigate to CODE-02", "Return to CODE-01"],
-        e: "The code editor restores the saved answer.",
-        a: "The editor is empty after returning.",
-      },
-    ];
+    async function loadBackendData() {
+      try {
+        const runs = await listRuns();
+        const rowsEl = $("#rows");
+        const bugsEl = $("#bugs");
+        const jrEl = $("#jr");
+        const cnt = $("#cnt");
 
-    const bugsEl = $("#bugs");
-    if (bugsEl) {
-      bugsEl.innerHTML = BUGS.map(
-        (b, i) =>
-          `<details class="bug ${b.s}"${i ? "" : " open"}><summary><span class="chip sev-${b.s}">${
-            b.s
-          }</span>${b.t}<span class="cat">${b.c}</span></summary><div class="bd"><div><h5>Steps to reproduce</h5><ol>${b.st
-            .map((x) => `<li>${x}</li>`)
-            .join("")}</ol></div><div class="diff"><div class="e"><b>+ Expected</b>${
-            b.e
-          }</div><div class="a"><b>− Actual</b>${b.a}</div></div><div><h5>Evidence</h5>${ev(
-            css("--cr")
-          )}</div></div></details>`
-      ).join("");
-    }
+        if (rowsEl) {
+          if (!runs || runs.length === 0) {
+            rowsEl.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">No runs recorded yet. Launch a QA Swarm above to start your first run.</td></tr>`;
+          } else {
+            rowsEl.innerHTML = runs
+              .map((r) => {
+                const statusClass =
+                  r.status === "completed" ? "p-c" :
+                  r.status === "testing" ? "p-t" :
+                  r.status === "exploring" ? "p-e" :
+                  r.status === "failed" ? "p-f" : "p-q";
+                const bugCount = r.summary?.bugs_count ?? 0;
+                const dur = r.finished_at && r.started_at
+                  ? `${Math.max(1, Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()) / 1000))}s`
+                  : (r.status === "pending" ? "–" : r.status);
+                const name = r.name || r.target_url;
+                return `<tr><td class="sel"><a href="/runs/${r.id}" style="color:inherit;text-decoration:none">${name}</a></td><td><span class="pill ${statusClass}"><b></b>${r.status}</span></td><td>${bugCount}</td><td>${dur}</td></tr>`;
+              })
+              .join("");
+          }
+        }
 
-    const jrEl = $("#jr");
-    if (jrEl) {
-      jrEl.innerHTML = [
-        ["Sign up", 2],
-        ["Log in", 3],
-        ["Reset password", 2],
-        ["Contact us", 1],
-        ["Open dashboard", 2],
-      ]
-        .map(
-          (j) =>
-            `<div class="jr"><b>${j[0]}</b><span>${j[1]} pages mapped</span></div>`
-        )
-        .join("");
+        const latest = runs && runs.length > 0 ? runs[0] : null;
+        const totalScenarios = latest?.summary?.tests_total ?? 0;
+        const passedScenarios = latest?.summary?.tests_passed ?? 0;
+        const passRate = totalScenarios > 0 ? Math.round((passedScenarios / totalScenarios) * 100) : null;
+        const bugsCaught = latest?.summary?.bugs_count ?? 0;
+
+        const kpiScenarios = $("#kpiScenarios");
+        const kpiPassRate = $("#kpiPassRate");
+        const kpiBugs = $("#kpiBugs");
+        const kpiVerdict = $("#kpiVerdict");
+        const kpiVerdictNote = $("#kpiVerdictNote");
+
+        if (kpiScenarios) {
+          kpiScenarios.textContent = String(totalScenarios);
+          kpiScenarios.dataset.n = String(totalScenarios);
+        }
+        if (kpiPassRate) kpiPassRate.textContent = passRate !== null ? `Total · ${passRate}% pass rate` : "Total · No tests run yet";
+        if (kpiBugs) {
+          kpiBugs.textContent = String(bugsCaught);
+          kpiBugs.dataset.n = String(bugsCaught);
+        }
+        if (kpiVerdict) {
+          if (!latest) {
+            kpiVerdict.textContent = "IDLE";
+            kpiVerdict.className = "verdict-idle";
+          } else if (bugsCaught > 0) {
+            kpiVerdict.textContent = "FAIL";
+            kpiVerdict.className = "verdict-fail";
+          } else if (latest.status === "completed") {
+            kpiVerdict.textContent = "PASS";
+            kpiVerdict.className = "verdict-pass";
+          } else {
+            kpiVerdict.textContent = latest.status.toUpperCase();
+            kpiVerdict.className = "verdict-idle";
+          }
+        }
+        if (kpiVerdictNote) {
+          kpiVerdictNote.textContent = !latest
+            ? "Launch a run to evaluate"
+            : bugsCaught > 0
+            ? "High-severity findings require fixes"
+            : "No defects identified";
+        }
+
+        if (bugsEl) {
+          bugsEl.innerHTML = `<p style="padding:24px;text-align:center;color:var(--mu)">No bugs recorded in this view. ${latest ? `<a href="/runs/${latest.id}" style="color:var(--cy)">View run telemetry →</a>` : 'Launch a QA run to detect defects.'}</p>`;
+        }
+        if (jrEl) {
+          jrEl.innerHTML = `<p style="padding:24px;text-align:center;color:var(--mu)">No journeys recorded in this view. ${latest ? `<a href="/runs/${latest.id}" style="color:var(--cy)">View run telemetry →</a>` : 'Launch a QA run to map pages.'}</p>`;
+        }
+        if (cnt) {
+          cnt.textContent = latest ? `${bugsCaught} in latest` : "0 found";
+        }
+      } catch {
+        const rowsEl = $("#rows");
+        if (rowsEl) {
+          rowsEl.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--mu)">Connect to backend to view recent runs.</td></tr>`;
+        }
+      }
     }
+    loadBackendData();
 
     $$(".tabs button").forEach(
       (b) =>
@@ -293,26 +310,10 @@ export default function Home() {
           $$(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
           const bTab = $("#bugs");
           const jTab = $("#jr");
-          const cnt = $("#cnt");
           if (bTab) bTab.hidden = b.dataset.p !== "bugs";
           if (jTab) jTab.hidden = b.dataset.p !== "jr";
-          if (cnt) cnt.textContent = b.dataset.p === "bugs" ? "4 found" : "14 mapped";
         })
     );
-
-    const RUNS = [
-      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 18s"],
-      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 06s"],
-      ["sample-assessment / bugs-on", "p-c", "Completed", 5, "3m 22s"],
-      ["staging.example.dev", "p-q", "Queued", "–", "–"],
-    ];
-    const rowsEl = $("#rows");
-    if (rowsEl) {
-      rowsEl.innerHTML = RUNS.map(
-        (r) =>
-          `<tr><td class="sel">${r[0]}</td><td><span class="pill ${r[1]}"><b></b>${r[2]}</span></td><td>${r[3]}</td><td>${r[4]}</td></tr>`
-      ).join("");
-    }
 
     /* ---------- counters ---------- */
     function kcount() {
@@ -452,10 +453,10 @@ export default function Home() {
         try {
           const runRes = await createRun({
             target_url: target,
-            agent_mode: "real",
-            max_depth: 2,
-            max_pages: 5,
-            max_tests: 10,
+            agent_mode: mode === "mock" ? "mock" : "real",
+            max_depth: +($("#depth")?.textContent || "2"),
+            max_pages: +($("#pages")?.textContent || "10"),
+            max_tests: 20,
           });
           window.location.href = `/runs/${runRes.id}`;
         } catch (err: any) {
@@ -659,9 +660,9 @@ export default function Home() {
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
                   <p>Questions covered</p>
                   <strong>
-                    <span data-n="6">6</span><span className="kpi-denom"> / 6</span>
+                    <span id="kpiQuestions" data-n="0">0</span><span className="kpi-denom"> / 6</span>
                   </strong>
-                  <small>MCQ 4 · Coding 2</small>
+                  <small>Target: 4 MCQ · 2 Coding</small>
                   <div className="dots">
                     <i />
                     <i />
@@ -675,29 +676,28 @@ export default function Home() {
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
                   <p>Scenarios executed</p>
                   <strong>
-                    <span data-n="9">9</span>
+                    <span id="kpiScenarios" data-n="0">0</span>
                   </strong>
-                  <small>Total · 96% pass rate</small>
+                  <small id="kpiPassRate">Total · No tests run yet</small>
                   <div className="bar">
                     <i />
                   </div>
                 </div>
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
-                  <p>Planted bugs detected</p>
+                  <p>Bugs caught</p>
                   <strong>
-                    <span data-n="5">5</span>
+                    <span id="kpiBugs" data-n="0">0</span>
                   </strong>
                   <div className="chips">
-                    <span className="chip sev-critical">3 MCQ</span>
-                    <span className="chip sev-high">2 coding</span>
+                    <small style={{ color: "var(--mu)", fontSize: "12px" }}>Awaiting run execution</small>
                   </div>
                 </div>
                 <div className="card kpi" style={{ "--k": "var(--glow)" } as React.CSSProperties}>
                   <p>QA health verdict</p>
                   <strong>
-                    <span className="verdict-fail">FAIL</span>
+                    <span id="kpiVerdict" className="verdict-idle">IDLE</span>
                   </strong>
-                  <small>High-severity findings require fixes</small>
+                  <small id="kpiVerdictNote">Launch a run to evaluate</small>
                   <svg className="gauge" width="44" height="44" viewBox="0 0 44 44">
                     <circle cx="22" cy="22" r="18" fill="none" stroke="var(--card2)" strokeWidth="5" />
                     <circle
@@ -708,7 +708,7 @@ export default function Home() {
                       stroke="var(--cy)"
                       strokeWidth="5"
                       strokeLinecap="round"
-                      strokeDasharray="111 113"
+                      strokeDasharray="0 113"
                       transform="rotate(-90 22 22)"
                     />
                   </svg>
@@ -724,7 +724,7 @@ export default function Home() {
                       Journeys
                     </button>
                   </div>
-                  <small id="cnt">5 found</small>
+                  <small id="cnt">0 found</small>
                 </div>
                 <div className="list" id="bugs" />
                 <div className="list" id="jr" hidden />
@@ -734,7 +734,7 @@ export default function Home() {
 
           <section className="assessment-grid" aria-label="Assessment QA overview">
             <section className="card assessment-overview">
-              <div className="hd">Assessment overview <small>sample assessment</small></div>
+              <div className="hd">Assessment benchmark specification <small>Code Apex target profile</small></div>
               <div className="assessment-body">
                 <div><span className="metric-label">Lifecycle</span><strong>Assessment → Section → Question → Answer → Result</strong></div>
                 <div><span className="metric-label">Question mix</span><strong>4 MCQ · 2 Coding</strong></div>
@@ -782,7 +782,7 @@ export default function Home() {
 
           <section className="card runs">
             <div className="hd">
-              Recent runs <small>Sample data</small>
+              Recent runs <small>Telemetry history</small>
             </div>
             <div className="tw">
               <table>

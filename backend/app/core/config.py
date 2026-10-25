@@ -48,7 +48,25 @@ class Settings(BaseSettings):
 
     llm_provider: LLMProvider = LLMProvider.NONE
     gemini_api_key: SecretStr = SecretStr("")
+    google_api_key: SecretStr = SecretStr("")
     anthropic_api_key: SecretStr = SecretStr("")
+
+    @property
+    def resolved_gemini_api_key(self) -> str:
+        """Get cleaned Gemini API key from settings or environment without secrets."""
+        for key in (self.gemini_api_key, self.google_api_key):
+            try:
+                val = key.get_secret_value().strip().strip('"').strip("'")
+                if val:
+                    return val
+            except Exception:
+                pass
+        import os
+        for env_var in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+            val = os.environ.get(env_var, "").strip().strip('"').strip("'")
+            if val:
+                return val
+        return ""
 
     # ---------- helpers ----------
 

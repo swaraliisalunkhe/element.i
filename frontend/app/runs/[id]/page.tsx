@@ -51,7 +51,16 @@ export default function RunDetail() {
     const stop = subscribeRunEvents(id, {
       onEvent: (e) => {
         setEvents((prev) => (prev.some((p) => p.seq === e.seq) ? prev : [...prev, e].sort((a, b) => a.seq - b.seq)));
-        loadSoon();
+        if (
+          e.type === "journey_discovered" ||
+          e.type === "test_completed" ||
+          e.type === "bug_reported" ||
+          e.type === "run_status_changed" ||
+          e.type === "run_completed" ||
+          e.type === "run_failed"
+        ) {
+          loadSoon();
+        }
       },
       onEnd: () => {
         setStreamDone(true);
@@ -168,7 +177,7 @@ export default function RunDetail() {
 
           {/* Right Column: KPIs & Bugs/Journeys */}
           <div className="col">
-            <KpiCards summary={run.summary} />
+            <KpiCards summary={run.summary} bugs={bugs} tests={tests} journeys={journeys} />
 
             <BugList bugs={bugs} journeys={journeys} />
           </div>
