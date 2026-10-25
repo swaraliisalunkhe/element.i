@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { AgentEvent, Run } from "@/lib/types";
+import { evidenceSrc } from "@/lib/api";
 
 interface LiveViewportProps {
   run?: Run | null;
@@ -17,94 +18,29 @@ export default function LiveViewport({
   events = [],
   live = true,
   targetUrl,
-  isInteractiveRun = false,
 }: LiveViewportProps) {
-  const urlDisplay = (targetUrl ?? run?.target_url ?? "https://code-apex-sample-app-v2.onrender.com/").replace(/\/$/, "");
+  const currentUrl =
+    (latestEvent?.data?.url as string) ||
+    (latestEvent?.data?.current_url as string) ||
+    targetUrl ||
+    run?.target_url ||
+    "https://code-apex-sample-app-v2.onrender.com/";
 
-  const [emailText, setEmailText] = useState("");
-  const [passwordText, setPasswordText] = useState("");
-  const [isDone, setIsDone] = useState(false);
-  const [alertOn, setAlertOn] = useState(false);
-  const [bbox, setBbox] = useState<{ on: boolean; bad: boolean; selector: string; style: React.CSSProperties }>({
-    on: false,
-    bad: false,
-    selector: "",
-    style: {},
-  });
-  const [aiPos, setAiPos] = useState({ x: 20, y: 20, click: false });
-
-  const stageRef = useRef<HTMLDivElement>(null);
-
-  // Sync with live event stream or sequence
-  const seq = latestEvent?.seq ?? (events.length > 0 ? events[events.length - 1].seq : 0);
-
-  useEffect(() => {
-    if (seq >= 5 || latestEvent?.type === "bug_reported" || latestEvent?.type === "run_completed") {
-      setIsDone(true);
-      setAlertOn(true);
-      setBbox({
-        on: true,
-        bad: true,
-        selector: "#error-message",
-        style: { left: "20%", top: "30%", width: "60%", height: "45%" },
-      });
-      setAiPos({ x: 190, y: 120, click: false });
-      return;
+  // Look for latest screenshot evidence across recent events
+  const latestScreenshot = (() => {
+    if (latestEvent?.data?.screenshot_url) {
+      return String(latestEvent.data.screenshot_url);
     }
-
-    if (seq === 4 || latestEvent?.type === "test_completed") {
-      setEmailText("user@example.com");
-      setPasswordText("");
-      setIsDone(true);
-      setAlertOn(true);
-      setBbox({
-        on: true,
-        bad: true,
-        selector: "button[type='submit']",
-        style: { left: "30%", top: "58%", width: "40%", height: "34px" },
-      });
-      setAiPos({ x: 170, y: 145, click: true });
-      return;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const url = events[i].data?.screenshot_url;
+      if (url) return String(url);
     }
+    return null;
+  })();
 
-    if (seq === 3 || latestEvent?.agent === "tester") {
-      setEmailText("user@example.com");
-      setPasswordText("");
-      setIsDone(false);
-      setAlertOn(false);
-      setBbox({
-        on: true,
-        bad: false,
-        selector: "#email",
-        style: { left: "30%", top: "32%", width: "40%", height: "30px" },
-      });
-      setAiPos({ x: 165, y: 88, click: false });
-      return;
-    }
-
-    if (seq >= 1) {
-      setEmailText("");
-      setPasswordText("");
-      setIsDone(false);
-      setAlertOn(false);
-      setBbox({
-        on: true,
-        bad: false,
-        selector: "#email",
-        style: { left: "30%", top: "32%", width: "40%", height: "30px" },
-      });
-      setAiPos({ x: 120, y: 50, click: false });
-      return;
-    }
-
-    // Default reset
-    setEmailText("");
-    setPasswordText("");
-    setIsDone(false);
-    setAlertOn(false);
-    setBbox({ on: false, bad: false, selector: "", style: {} });
-    setAiPos({ x: 20, y: 20, click: false });
-  }, [seq, latestEvent]);
+  const activeSelector = latestEvent?.data?.selector ? String(latestEvent.data.selector) : null;
+  const isBugReported = latestEvent?.type === "bug_reported";
+  const agentName = latestEvent?.agent || (live ? "orchestrator" : "system");
 
   return (
     <section className="card">
@@ -116,7 +52,7 @@ export default function LiveViewport({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
             <path d="M7 10V8a5 5 0 0110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9a1 1 0 011-1h1zm2 0h6V8a3 3 0 00-6 0v2z" />
           </svg>
-          <span id="addr">{urlDisplay}</span>
+          <span id="addr">{currentUrl}</span>
         </div>
         <span className="radar">
           <b />
@@ -124,60 +60,56 @@ export default function LiveViewport({
         </span>
       </div>
 
-      <div className={`stage ${isDone ? "done" : ""}`} id="stage" ref={stageRef}>
-        <div className="nav">
-          <b />
-          <span />
-          <span />
-          <span />
-        </div>
-
-        <div className="site">
-          <div className="form">
-            <h4>Welcome back</h4>
-            <label>Email</label>
-            <div className="fld" id="email">
-              {emailText}
-            </div>
-            <label>Password</label>
-            <div className="fld" id="password">
-              {passwordText}
-            </div>
-            <div className="sbtn" id="submit">
-              Sign in
-            </div>
+      <div className="stage" id="stage" style={{ minHeight: "260px", position: "relative", overflow: "hidden" }}>
+        {latestScreenshot ? (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={evidenceSrc(latestScreenshot)}
+              alt="Live browser screenshot"
+              style={{ maxWidth: "100%", maxHeight: "320px", objectFit: "contain", borderRadius: "4px" }}
+            />
           </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "36px 20px",
+              height: "100%",
+              textAlign: "center",
+              gap: "12px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className={`tag t-${agentName}`} style={{ textTransform: "uppercase", fontWeight: 700 }}>
+                {agentName}
+              </span>
+              <span style={{ fontSize: "12px", color: "var(--mu)" }}>
+                {live ? "Browser Automation Active" : "Run Finished"}
+              </span>
+            </div>
 
-          <div className="welcome">
-            <h4>Dashboard</h4>
-            <p id="who">Welcome, user@example.com</p>
+            <p style={{ margin: "4px 0", fontSize: "14px", fontWeight: 500, maxWidth: "480px" }}>
+              {latestEvent?.message || (live ? "Initializing browser driver..." : "Execution completed.")}
+            </p>
+
+            {activeSelector && (
+              <div style={{ fontSize: "12px", color: "var(--cy)", fontFamily: "monospace", background: "var(--card2)", padding: "4px 8px", borderRadius: "4px" }}>
+                Target: {activeSelector}
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
-        {/* Animated Bounding Box */}
-        <div
-          className={`bbox ${bbox.on ? "on" : ""} ${bbox.bad ? "bad" : ""}`}
-          id="bb"
-          style={bbox.style}
-          data-s={bbox.selector}
-        />
-
-        {/* Floating AI Virtual Cursor */}
-        <svg
-          className={`ai ${aiPos.click ? "click" : ""}`}
-          id="ai"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          style={{ transform: `translate(${aiPos.x}px, ${aiPos.y}px)` }}
-        >
-          <path d="M3 2l7 19 3-8 8-3z" />
-        </svg>
-
-        {/* Critical Alert Banner */}
-        <div className={`alert ${alertOn ? "on" : ""}`} id="al">
-          <b>Critical</b>
-          <span>Login accepted an empty password and opened the dashboard.</span>
-        </div>
+        {isBugReported && (
+          <div className="alert on" id="al">
+            <b>{String(latestEvent?.data?.severity || "Bug Reported").toUpperCase()}</b>
+            <span>{latestEvent?.message || "Anomaly detected by test agent."}</span>
+          </div>
+        )}
       </div>
     </section>
   );

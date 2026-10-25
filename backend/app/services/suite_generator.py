@@ -69,12 +69,18 @@ def get_gemini_api_key(settings: Settings | None = None) -> str:
     """Retrieve Gemini API key from settings or environment without logging secrets."""
     if settings:
         try:
+            if hasattr(settings, "resolved_gemini_api_key") and settings.resolved_gemini_api_key:
+                return settings.resolved_gemini_api_key
             val = settings.gemini_api_key.get_secret_value()
             if val:
-                return val.strip()
+                return val.strip().strip('"').strip("'")
         except Exception:
             pass
-    return os.environ.get("GEMINI_API_KEY", "").strip()
+    for env_var in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env_var, "").strip().strip('"').strip("'")
+        if val:
+            return val
+    return ""
 
 
 def get_gemini_model() -> str:
@@ -452,10 +458,25 @@ STRICT REQUIREMENTS:
         journey_id = journeys[0].id if journeys else None
         target_url = ctx.run.target_url
 
+        def _find_url(sel: str | None, hint: str = "") -> str:
+            if sel:
+                for j in journeys:
+                    for p in j.pages:
+                        for elem in p.elements:
+                            if elem.selector == sel:
+                                return p.url
+            if hint:
+                for j in journeys:
+                    for p in j.pages:
+                        if hint.lower() in p.url.lower():
+                            return p.url
+            return assessment_map.url or target_url
+
         # 1. Timer & Header verification
         if assessment_map.timer_selector:
+            timer_url = _find_url(assessment_map.timer_selector, "assessment")
             steps = [
-                TestStep(index=1, action=BrowserAction.NAVIGATE, url=target_url, description=f"Open {target_url}"),
+                TestStep(index=1, action=BrowserAction.NAVIGATE, url=timer_url, description=f"Open {timer_url}"),
                 TestStep(index=2, action=BrowserAction.ASSERT_VISIBLE, selector=assessment_map.timer_selector, description="Verify timer visibility"),
                 TestStep(index=3, action=BrowserAction.ASSERT_TEXT, selector=assessment_map.timer_selector, value=":", description="Verify timer shows countdown format"),
             ]
@@ -476,8 +497,9 @@ STRICT REQUIREMENTS:
         if assessment_map.questions and assessment_map.questions[0].options:
             q = assessment_map.questions[0]
             opt = q.options[0]
+            mcq_url = _find_url(opt.selector, "mcq")
             steps = [
-                TestStep(index=1, action=BrowserAction.NAVIGATE, url=target_url, description=f"Open {target_url}"),
+                TestStep(index=1, action=BrowserAction.NAVIGATE, url=mcq_url, description=f"Open {mcq_url}"),
                 TestStep(index=2, action=BrowserAction.ASSERT_VISIBLE, selector=opt.selector, description=f"Verify option {opt.label}"),
                 TestStep(index=3, action=BrowserAction.CHECK if opt.is_radio else BrowserAction.CLICK, selector=opt.selector, description=f"Select option {opt.label}"),
             ]
@@ -497,8 +519,9 @@ STRICT REQUIREMENTS:
         # 3. Question Palette verification
         if assessment_map.palette_items:
             pal = assessment_map.palette_items[0]
+            pal_url = _find_url(pal.selector, "mcq")
             steps = [
-                TestStep(index=1, action=BrowserAction.NAVIGATE, url=target_url, description=f"Open {target_url}"),
+                TestStep(index=1, action=BrowserAction.NAVIGATE, url=pal_url, description=f"Open {pal_url}"),
                 TestStep(index=2, action=BrowserAction.ASSERT_VISIBLE, selector=pal.selector, description=f"Verify palette item {pal.number}"),
             ]
             cases.append(
@@ -517,8 +540,9 @@ STRICT REQUIREMENTS:
         # 4. Code Editor verification (if present)
         if assessment_map.code_editor:
             editor = assessment_map.code_editor
+            editor_url = _find_url(editor.container_selector, "coding")
             steps = [
-                TestStep(index=1, action=BrowserAction.NAVIGATE, url=target_url, description=f"Open {target_url}"),
+                TestStep(index=1, action=BrowserAction.NAVIGATE, url=editor_url, description=f"Open {editor_url}"),
                 TestStep(index=2, action=BrowserAction.ASSERT_VISIBLE, selector=editor.container_selector, description="Verify code editor container"),
             ]
             if editor.run_button_selector:
@@ -541,8 +565,9 @@ STRICT REQUIREMENTS:
         # 5. Safe Submission Control visibility (never click)
         submit_ctrl = next((a for a in assessment_map.action_controls if a.is_consequential), None)
         if submit_ctrl:
+            submit_url = _find_url(submit_ctrl.selector, "mcq")
             steps = [
-                TestStep(index=1, action=BrowserAction.NAVIGATE, url=target_url, description=f"Open {target_url}"),
+                TestStep(index=1, action=BrowserAction.NAVIGATE, url=submit_url, description=f"Open {submit_url}"),
                 TestStep(index=2, action=BrowserAction.ASSERT_VISIBLE, selector=submit_ctrl.selector, description="Verify submit button visibility"),
             ]
             cases.append(

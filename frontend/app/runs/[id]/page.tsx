@@ -51,7 +51,16 @@ export default function RunDetail() {
     const stop = subscribeRunEvents(id, {
       onEvent: (e) => {
         setEvents((prev) => (prev.some((p) => p.seq === e.seq) ? prev : [...prev, e].sort((a, b) => a.seq - b.seq)));
-        loadSoon();
+        if (
+          e.type === "journey_discovered" ||
+          e.type === "test_completed" ||
+          e.type === "bug_reported" ||
+          e.type === "run_status_changed" ||
+          e.type === "run_completed" ||
+          e.type === "run_failed"
+        ) {
+          loadSoon();
+        }
       },
       onEnd: () => {
         setStreamDone(true);

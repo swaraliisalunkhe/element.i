@@ -215,10 +215,23 @@ class ExplorerAgent:
         if stripped_lower.startswith(("javascript:", "mailto:", "tel:", "data:", "#")):
             return None
 
+        # Reject unpopulated template or JavaScript null/undefined interpolations
+        if stripped_lower in ("null", "/null", "undefined", "/undefined", "none", "/none", "[object object]", "false", "true"):
+            return None
+
         resolved = urllib.parse.urljoin(current_page_url, raw_url.strip())
         parsed = urllib.parse.urlparse(resolved)
 
         if parsed.scheme not in ("http", "https"):
+            return None
+
+        hostname = (parsed.hostname or "").lower().strip()
+        if hostname in ("169.254.169.254", "metadata.google.internal", "instance-data", "169.254.169.253"):
+            return None
+
+        # Reject path segments that are unpopulated null/undefined
+        path_segments = [s.strip().lower() for s in parsed.path.split("/") if s.strip()]
+        if any(seg in ("null", "undefined", "[object object]", "none") for seg in path_segments):
             return None
 
         resolved_origin = f"{parsed.scheme}://{parsed.netloc}".lower()

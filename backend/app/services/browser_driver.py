@@ -247,7 +247,7 @@ class BrowserDriver:
         if hostname in ("169.254.169.254", "metadata.google.internal", "instance-data", "169.254.169.253"):
             raise ValueError(f"Prohibited navigation destination host: {hostname!r}")
         page = self._ensure_page()
-        response = await page.goto(url, wait_until="domcontentloaded")
+        response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
         title = await page.title()
         status = response.status if response is not None else 200
         return {
