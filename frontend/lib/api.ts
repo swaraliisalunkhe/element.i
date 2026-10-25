@@ -20,8 +20,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
       cache: "no-store",
     });
-  } catch {
-    throw new Error(`Cannot reach the backend at ${API_BASE}. Check that it is running and that this page is open on localhost:3000.`);
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Cannot reach the backend at ${API_BASE} (${detail}). Ensure the backend is running and CORS is configured.`);
   }
   let body: unknown = null;
   try { body = await res.json(); } catch { /* handled below */ }

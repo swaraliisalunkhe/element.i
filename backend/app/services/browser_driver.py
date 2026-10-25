@@ -9,6 +9,7 @@ browser session resetting, and clean resource teardown.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -142,8 +143,21 @@ class BrowserDriver:
         if self._page is not None:
             return
 
+        launch_args = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+        ]
+        if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ:
+            render_browsers = Path("/opt/render/project/src/.ms-playwright")
+            if render_browsers.is_dir():
+                os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(render_browsers)
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=headless)
+        self._browser = await self._playwright.chromium.launch(
+            headless=headless,
+            args=launch_args,
+        )
         self._context = await self._browser.new_context()
         self._page = await self._context.new_page()
 

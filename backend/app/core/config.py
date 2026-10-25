@@ -85,16 +85,22 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Origins allowed to call the API from a browser (the Next.js dashboard)."""
-        raw_origins = [o.strip() for o in self.frontend_origin.split(",") if o.strip()]
+        configured = [o.strip().rstrip("/") for o in self.frontend_origin.split(",") if o.strip()]
+        defaults = [
+            "https://element-i-frontend.onrender.com",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
         origins = []
-        for o in raw_origins:
-            origins.append(o)
-            if not o.startswith("http://") and not o.startswith("https://"):
-                origins.append(f"https://{o}")
-            if "localhost" in o:
-                origins.append(o.replace("localhost", "127.0.0.1"))
-            elif "127.0.0.1" in o:
-                origins.append(o.replace("127.0.0.1", "localhost"))
+        for o in configured + defaults:
+            clean = o.rstrip("/")
+            origins.append(clean)
+            if not clean.startswith("http://") and not clean.startswith("https://"):
+                origins.append(f"https://{clean}")
+            if "localhost" in clean:
+                origins.append(clean.replace("localhost", "127.0.0.1"))
+            elif "127.0.0.1" in clean:
+                origins.append(clean.replace("127.0.0.1", "localhost"))
         return list(dict.fromkeys(origins))
 
     def ensure_directories(self) -> None:
