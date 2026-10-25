@@ -1,35 +1,28 @@
 services:
   # =====================================================================
   # Service A: element.i Backend (FastAPI + Playwright + Uvicorn)
+  # Free tier web service with temporary local storage (data/ directory)
   # =====================================================================
   - type: web
     name: element-i-backend
     runtime: python
-    region: oregon
-    plan: starter
+    plan: free
     buildCommand: "pip install -r backend/requirements.txt && playwright install --with-deps chromium"
     startCommand: "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
-    disk:
-      name: element-i-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: PORT
         value: 10000
       - key: APP_ENV
         value: production
       - key: DATA_DIR
-        value: /var/data
+        value: data
       - key: DATABASE_URL
-        value: sqlite:////var/data/code_apex.db
+        value: sqlite:///data/code_apex.db
       - key: EVIDENCE_DIR
-        value: /var/data/evidence
+        value: data/evidence
       - key: FRONTEND_ORIGIN
-        fromService:
-          type: web
-          name: element-i-frontend
-          property: host
+        value: https://element-i-frontend.onrender.com
       - key: SAMPLE_APP_URL
         value: https://code-apex-sample-app-v2.onrender.com/
       - key: LLM_PROVIDER
@@ -39,21 +32,18 @@ services:
 
   # =====================================================================
   # Service B: element.i Frontend (Next.js 14 Dashboard)
+  # Free tier web service connected to the backend public URL
   # =====================================================================
   - type: web
     name: element-i-frontend
     runtime: node
-    region: oregon
-    plan: starter
+    plan: free
     buildCommand: "cd frontend && npm install && npm run build"
     startCommand: "cd frontend && npm start"
     envVars:
       - key: NODE_VERSION
         value: 18.20.0
       - key: NEXT_PUBLIC_API_BASE_URL
-        fromService:
-          type: web
-          name: element-i-backend
-          property: host
+        value: https://element-i-backend.onrender.com
       - key: NEXT_PUBLIC_USE_MOCKS
         value: "false"
