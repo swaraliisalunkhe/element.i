@@ -193,6 +193,12 @@ class BrowserDriver:
 
     async def open(self, url: str) -> dict[str, Any]:
         """Navigate to url and return page information (url, title, status)."""
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Prohibited navigation scheme: {parsed.scheme!r}")
+        hostname = (parsed.hostname or "").lower().strip()
+        if hostname in ("169.254.169.254", "metadata.google.internal", "instance-data", "169.254.169.253"):
+            raise ValueError(f"Prohibited navigation destination host: {hostname!r}")
         page = self._ensure_page()
         response = await page.goto(url, wait_until="domcontentloaded")
         title = await page.title()

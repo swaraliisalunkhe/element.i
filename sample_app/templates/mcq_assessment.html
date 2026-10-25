@@ -1,0 +1,283 @@
+
+{% extends "base.html" %}
+
+{% block title %}MCQ Assessment | {{ assessment.title }} | Code Apex{% endblock %}
+
+{% block content %}
+<div class="assessment-topbar">
+    <div>
+        <span class="assessment-badge orange">SECTION 1: TECHNICAL MCQ SCREENING</span>
+        <h1 style="font-size: 22px; font-weight: 800; margin-top: 6px; letter-spacing: -0.4px;" id="assessment-title">
+            {{ assessment.title }}
+        </h1>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <div class="timer-box" id="test-timer">
+            <span style="color: var(--primary-orange);">⏱</span>
+            <span id="timer-display">44:30</span>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm"
+                onclick="document.getElementById('mcq-form').requestSubmit();"
+                id="btn-top-submit">
+            Submit Test →
+        </button>
+    </div>
+</div>
+
+<div class="marking-scheme-callout">
+    <div>
+        <strong>Marking Scheme:</strong>
+        Each correct answer awards <strong>+4 marks</strong>. Each incorrect answer incurs a
+        <strong>-1 mark</strong> penalty (Negative Marking). Unattempted questions receive
+        <strong>0 marks</strong>.
+    </div>
+    <div style="font-size: 12px; font-weight: 700; color: #9a3412; letter-spacing: 0.5px;">
+        4 QUESTIONS • 16 MARKS TOTAL
+    </div>
+</div>
+
+<form id="mcq-form"
+      action="/assessments/{{ assessment.id }}/submit-mcq"
+      method="POST">
+    <input type="hidden" name="candidate_email"
+           value="{{ candidate_email or 'bob.candidate@example.com' }}">
+
+    <div class="mcq-layout">
+        <div class="question-panel">
+            {% for q in assessment.mcq_questions %}
+            <div class="question-container"
+                 id="question-block-{{ loop.index }}"
+                 style="{% if not loop.first %}display: none;{% endif %}">
+
+                <div class="question-header">
+                    <span class="question-number-pill" id="pill-q-{{ loop.index }}">
+                        Question {{ loop.index }} of {{ assessment.mcq_questions|length }}
+                    </span>
+                    <span class="question-marks-badge">+4 Marks / -1 Negative</span>
+                </div>
+
+                <h2 class="question-text" id="text-q-{{ loop.index }}">{{ q.text }}</h2>
+
+                {% if q.code_snippet %}
+                <div class="code-snippet-box">{{ q.code_snippet }}</div>
+                {% endif %}
+
+                <div class="options-list">
+                    {% for opt in q.options %}
+                    {#
+                        INTENTIONAL BUG MCQ-01:
+                        For Question 2, Option B displays normally but submits value C.
+                    #}
+                    {% set option_value = opt.key %}
+                    {% if q.id == 'q2' and opt.key == 'B' %}
+                        {% set option_value = 'C' %}
+                    {% endif %}
+
+                    <label class="option-card"
+                           id="label-{{ q.id }}-{{ opt.key }}"
+                           for="{{ q.id }}_opt_{{ opt.key }}">
+                        <input type="radio"
+                               name="q_{{ q.id }}"
+                               id="{{ q.id }}_opt_{{ opt.key }}"
+                               value="{{ option_value }}"
+                               onchange="handleOptionSelect('{{ q.id }}', '{{ opt.key }}')">
+
+                        <span class="option-key">{{ opt.key }}</span>
+                        <span class="option-text" id="desc-{{ q.id }}-{{ opt.key }}">
+                            {{ opt.text }}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="question-footer-nav">
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="clearSelection('q_{{ q.id }}')"
+                                id="btn-clear-{{ q.id }}">
+                            Clear Response
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        {% if not loop.first %}
+                        <button type="button" class="btn btn-secondary"
+                                onclick="navigateToQuestion({{ loop.index - 1 }})"
+                                id="btn-prev-{{ q.id }}">
+                            ← Previous
+                        </button>
+                        {% endif %}
+
+                        {% if not loop.last %}
+                        <button type="button" class="btn btn-primary"
+                                onclick="navigateToQuestion({{ loop.index + 1 }})"
+                                id="btn-next-{{ q.id }}">
+                            Next Question →
+                        </button>
+                        {% else %}
+                        <button type="submit" class="btn btn-primary"
+                                id="btn-submit-assessment">
+                            Submit Assessment →
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <aside class="palette-sidebar">
+            <h3 class="palette-title">Question Palette</h3>
+
+            <div class="palette-grid">
+                {% for q in assessment.mcq_questions %}
+                <button type="button"
+                        class="palette-btn {% if loop.first %}active{% endif %}"
+                        id="palette-btn-{{ loop.index }}"
+                        onclick="navigateToQuestion({{ loop.index }})">
+                    {{ loop.index }}
+                </button>
+                {% endfor %}
+            </div>
+
+            <div class="palette-legend">
+                <div class="legend-item">
+                    <span class="legend-indicator"
+                          style="background: var(--success-green);"></span>
+                    <span>Answered Question</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-indicator"
+                          style="border: 2px solid var(--primary-orange); background: var(--primary-orange-light);"></span>
+                    <span>Current Active</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-indicator"
+                          style="background: #ffffff; border: 1px solid #d1d5db;"></span>
+                    <span>Unanswered</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+                    Candidate Session:
+                    <strong style="display: block; color: var(--text-primary); margin-top: 3px;">
+                        {{ candidate_email or 'bob.candidate@example.com' }}
+                    </strong>
+                </div>
+
+                <button type="submit" class="btn btn-primary"
+                        style="width: 100%;" id="btn-sidebar-submit">
+                    Submit Assessment Now
+                </button>
+            </div>
+        </aside>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let currentQuestionIndex = 1;
+    const totalQuestions = {{ assessment.mcq_questions|length }};
+
+    function navigateToQuestion(targetIndex) {
+        if (targetIndex < 1 || targetIndex > totalQuestions) return;
+
+        const currentBlock = document.getElementById(
+            'question-block-' + currentQuestionIndex
+        );
+        if (currentBlock) currentBlock.style.display = 'none';
+
+        const oldPaletteBtn = document.getElementById(
+            'palette-btn-' + currentQuestionIndex
+        );
+        if (oldPaletteBtn) oldPaletteBtn.classList.remove('active');
+
+        currentQuestionIndex = targetIndex;
+
+        const targetBlock = document.getElementById(
+            'question-block-' + currentQuestionIndex
+        );
+        if (targetBlock) targetBlock.style.display = 'block';
+
+        const newPaletteBtn = document.getElementById(
+            'palette-btn-' + currentQuestionIndex
+        );
+        if (newPaletteBtn) newPaletteBtn.classList.add('active');
+    }
+
+    function handleOptionSelect(qId, optKey) {
+        const options = document.querySelectorAll(
+            `input[name="q_${qId}"]`
+        );
+
+        options.forEach(radio => {
+            const card = radio.closest('.option-card');
+            if (!card) return;
+
+            card.classList.toggle('selected', radio.checked);
+        });
+
+        const questionBlock = document.getElementById(
+            'question-block-' + currentQuestionIndex
+        );
+        const paletteButton = document.getElementById(
+            'palette-btn-' + currentQuestionIndex
+        );
+
+        if (questionBlock && paletteButton) {
+            const hasAnswer = questionBlock.querySelector(
+                'input[type="radio"]:checked'
+            );
+            paletteButton.classList.toggle('answered', Boolean(hasAnswer));
+        }
+    }
+
+    function clearSelection(radioName) {
+        const radios = document.querySelectorAll(
+            `input[name="${radioName}"]`
+        );
+
+        radios.forEach(radio => {
+            radio.checked = false;
+            const card = radio.closest('.option-card');
+            if (card) card.classList.remove('selected');
+        });
+
+        const questionBlock = document.getElementById(
+            'question-block-' + currentQuestionIndex
+        );
+        const paletteButton = document.getElementById(
+            'palette-btn-' + currentQuestionIndex
+        );
+
+        if (questionBlock && paletteButton) {
+            const hasAnswer = questionBlock.querySelector(
+                'input[type="radio"]:checked'
+            );
+            paletteButton.classList.toggle('answered', Boolean(hasAnswer));
+        }
+    }
+
+    // INTENTIONAL BUG MCQ-02:
+    // The form is not locked after submission. Repeated clicks can submit again.
+    // Do not add a one-time submission guard or disable submit buttons.
+
+    let remainingSeconds = 44 * 60 + 30;
+    const timerElem = document.getElementById('timer-display');
+
+    setInterval(() => {
+        if (remainingSeconds > 0) {
+            remainingSeconds--;
+
+            const mins = Math.floor(remainingSeconds / 60);
+            const secs = remainingSeconds % 60;
+
+            timerElem.textContent =
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+</script>
+{% endblock %}

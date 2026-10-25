@@ -1,0 +1,59 @@
+services:
+  # =====================================================================
+  # Service A: element.i Backend (FastAPI + Playwright + Uvicorn)
+  # =====================================================================
+  - type: web
+    name: element-i-backend
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: "pip install -r backend/requirements.txt && playwright install --with-deps chromium"
+    startCommand: "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    disk:
+      name: element-i-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: APP_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: DATABASE_URL
+        value: sqlite:////var/data/code_apex.db
+      - key: EVIDENCE_DIR
+        value: /var/data/evidence
+      - key: FRONTEND_ORIGIN
+        fromService:
+          type: web
+          name: element-i-frontend
+          property: host
+      - key: SAMPLE_APP_URL
+        value: https://code-apex-sample-app-v2.onrender.com/
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # =====================================================================
+  # Service B: element.i Frontend (Next.js 14 Dashboard)
+  # =====================================================================
+  - type: web
+    name: element-i-frontend
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: "cd frontend && npm install && npm run build"
+    startCommand: "cd frontend && npm start"
+    envVars:
+      - key: NODE_VERSION
+        value: 18.20.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        fromService:
+          type: web
+          name: element-i-backend
+          property: host
+      - key: NEXT_PUBLIC_USE_MOCKS
+        value: "false"

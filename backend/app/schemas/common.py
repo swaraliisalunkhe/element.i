@@ -19,10 +19,13 @@ def new_id(prefix: str) -> str:
 
 
 def validate_http_url(value: str) -> str:
-    """Accept only absolute http/https URLs."""
+    """Accept only absolute http/https URLs and block SSRF vectors like cloud metadata."""
     parsed = urlparse(value)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError("must be an absolute http:// or https:// URL")
+    hostname = (parsed.hostname or "").lower().strip()
+    if hostname in ("169.254.169.254", "metadata.google.internal", "instance-data", "169.254.169.253"):
+        raise ValueError(f"access to target host '{hostname}' is prohibited")
     return value
 
 

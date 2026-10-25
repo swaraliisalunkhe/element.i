@@ -1,35 +1,44 @@
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contact | Code Apex</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <nav>
-        <a href="/">Home</a>
-        <a href="/signup">Sign Up</a>
-        <a href="/login">Login</a>
-        <a href="/contact">Contact</a>
-    </nav>
+{% block title %}Candidate Support | Code Apex{% endblock %}
 
-    <main>
-        <h1>Contact Us</h1>
+{% block content %}
+<div style="max-width: 560px; margin: 40px auto;">
+    <div class="card" style="padding: 36px;">
+        <h1 style="font-size: 26px; font-weight: 800; margin-bottom: 8px;" id="contact-title">Assessment Support</h1>
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;">
+            Need technical assistance during your online assessment? Send an inquiry to our assessment coordination team.
+        </p>
 
-        <form action="/contact" method="post">
-            <label for="name">Name</label>
-            <input id="name" name="name" type="text">
+        {% if success_message %}
+        <div style="background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success-green); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 20px; font-size: 14px;">
+            {{ success_message }}
+        </div>
+        {% endif %}
 
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" required>
+        <form action="/contact" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label for="name" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Your Name</label>
+                <input id="name" name="name" type="text" placeholder="Candidate or Recruiter Name"
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
 
-            <label for="message">Message</label>
-            <textarea id="message" name="message" rows="5"></textarea>
+            <div style="margin-bottom: 16px;">
+                <label for="email" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Email Address</label>
+                <input id="email" name="email" type="email" required placeholder="name@example.com"
+                       style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
 
-            <button id="contact-btn" type="submit">Send Message</button>
+            <div style="margin-bottom: 24px;">
+                <label for="message" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Inquiry / Message</label>
+                <textarea id="message" name="message" rows="4" placeholder="Describe the question or technical issue..."
+                          style="width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;"></textarea>
+            </div>
+
+            <button id="contact-btn" type="submit" class="btn btn-primary" style="width: 100%;">
+                Submit Inquiry →
+            </button>
         </form>
-    </main>
-</body>
-</html>
+    </div>
+</div>
+{% endblock %}

@@ -85,12 +85,17 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Origins allowed to call the API from a browser (the Next.js dashboard)."""
-        origins = [self.frontend_origin]
-        if "localhost" in self.frontend_origin:
-            origins.append(self.frontend_origin.replace("localhost", "127.0.0.1"))
-        elif "127.0.0.1" in self.frontend_origin:
-            origins.append(self.frontend_origin.replace("127.0.0.1", "localhost"))
-        return origins
+        raw_origins = [o.strip() for o in self.frontend_origin.split(",") if o.strip()]
+        origins = []
+        for o in raw_origins:
+            origins.append(o)
+            if not o.startswith("http://") and not o.startswith("https://"):
+                origins.append(f"https://{o}")
+            if "localhost" in o:
+                origins.append(o.replace("localhost", "127.0.0.1"))
+            elif "127.0.0.1" in o:
+                origins.append(o.replace("127.0.0.1", "localhost"))
+        return list(dict.fromkeys(origins))
 
     def ensure_directories(self) -> None:
         """Create the data and evidence folders if they do not exist."""
