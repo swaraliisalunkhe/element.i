@@ -590,3 +590,41 @@ def test_assessment_qa_workflow_fallback_on_gemini_error(tmp_path: Path) -> None
         assert all(r.status == TestStatus.PASSED for r in output.test_results)
     finally:
         del os.environ["GEMINI_API_KEY"]
+
+
+def test_nvidia_valid_response_parsing(tmp_path: Path, monkeypatch) -> None:
+    """Verify parsing and validation of a valid structured JSON response from NVIDIA NIM."""
+    ctx = _make_context(tmp_path)
+    amap = _make_sample_assessment_map()
+    journey = Journey(
+        run_id=ctx.run.id,
+        name="Assessment Journey",
+        start_url="http://test.local/exam",
+        pages=[DiscoveredPage(url="http://test.local/exam", depth=0, elements=[])],
+        generated_by=GenerationMode.RULE_BASED,
+    )
+
+    valid_payload = {
+        "cases": [
+            {
+                "title": "Verify Timer with NVIDIA",
+                "description": "Ensure timer is visible",
+                "priority": 1,
+                "steps": [
+                    {"index": 1, "action": "navigate", "url": "http://test.local/exam"},
+                    {"index": 2, "action": "assert_visible", "selector": "#timer"},
+                ],
+                "expected_result": "Timer is displayed accurately.",
+            }
+        ]
+    }
+
+    suite_gen = SuiteGenerator()
+    monkeypatch.setattr(suite_gen, "_call_nvidia", lambda *args, **kwargs: json.dumps(valid_payload))
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test-key-abc")
+
+    test_cases = suite_gen.generate_suite(ctx, amap, [journey])
+    assert len(test_cases) == 1
+    assert test_cases[0].title == "Verify Timer with NVIDIA"
+    assert test_cases[0].generated_by == GenerationMode.LLM
+

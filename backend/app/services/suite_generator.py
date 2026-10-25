@@ -27,6 +27,7 @@ from app.core.constants import (
     EventLevel,
     EventType,
     GenerationMode,
+    LLMProvider,
 )
 from app.schemas.journey import Journey
 from app.schemas.test_case import TestCase, TestStep
@@ -88,15 +89,40 @@ def get_gemini_model() -> str:
     return os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
 
 
+DEFAULT_NVIDIA_MODEL = "meta/llama-3.1-70b-instruct"
+DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+
+def get_nvidia_api_key(settings: Settings | None = None) -> str:
+    """Retrieve NVIDIA API key from settings or environment without logging secrets."""
+    if settings and hasattr(settings, "resolved_nvidia_api_key") and settings.resolved_nvidia_api_key:
+        return settings.resolved_nvidia_api_key
+    return os.environ.get("NVIDIA_API_KEY", "").strip().strip('"').strip("'")
+
+
+def get_nvidia_model(settings: Settings | None = None) -> str:
+    """Retrieve configured NVIDIA model ID with fallback to meta/llama-3.1-70b-instruct."""
+    if settings and hasattr(settings, "nvidia_model") and settings.nvidia_model:
+        return settings.nvidia_model.strip()
+    return os.environ.get("NVIDIA_MODEL", DEFAULT_NVIDIA_MODEL).strip() or DEFAULT_NVIDIA_MODEL
+
+
+def get_nvidia_base_url(settings: Settings | None = None) -> str:
+    """Retrieve configured NVIDIA Base URL."""
+    if settings and hasattr(settings, "nvidia_base_url") and settings.nvidia_base_url:
+        return settings.nvidia_base_url.strip()
+    return os.environ.get("NVIDIA_BASE_URL", DEFAULT_NVIDIA_BASE_URL).strip() or DEFAULT_NVIDIA_BASE_URL
+
+
 class SuiteGenerator:
-    """Generates validated assessment test cases using Gemini 3.8 Flash or deterministic fallback."""
+    """Generates validated assessment test cases using NVIDIA NIM, Gemini, or deterministic fallback."""
 
     def __init__(
         self,
         model: str | None = None,
         client: Any = None,
     ) -> None:
-        self.model = model or get_gemini_model()
+        self.model = model
         self._client = client
 
     def _get_client(self, api_key: str) -> Any:
@@ -111,9 +137,7 @@ class SuiteGenerator:
         assessment_map: AssessmentMap | None,
         journeys: list[Journey],
     ) -> list[TestCase]:
-        """Generate test cases via Gemini if configured, falling back to deterministic templates."""
-        api_key = get_gemini_api_key(ctx.settings)
-
+        """Generate test cases via NVIDIA NIM or Gemini if configured, falling back to deterministic templates."""
         # 1. Resolve AssessmentMap (reconstructing from journeys if None)
         if assessment_map is None:
             assessment_map = AssessmentMap.from_journeys(journeys)
@@ -122,74 +146,205 @@ class SuiteGenerator:
             logger.info("No assessment detected; using generic test generation.")
             return self._generate_generic_fallback(ctx, journeys)
 
-        # 2. Fallback if no API key configured
-        if not api_key:
-            ctx.emit(
-                EventType.AGENT_PROGRESS,
-                AgentName.TESTER,
-                "GEMINI_API_KEY is not configured; using deterministic rule-based assessment test suite.",
-                level=EventLevel.INFO,
-                data={"reason": "missing_api_key"},
-            )
-            return self._generate_assessment_fallback(ctx, assessment_map, journeys)
+        # 2. Determine active provider
+        active_provider = (
+            getattr(ctx.settings, "resolved_llm_provider", LLMProvider.NONE)
+            if ctx.settings
+            else LLMProvider.NONE
+        )
+        if active_provider == LLMProvider.NONE:
+            if get_nvidia_api_key(ctx.settings):
+                active_provider = LLMProvider.NVIDIA
+            elif get_gemini_api_key(ctx.settings):
+                active_provider = LLMProvider.GEMINI
 
         # 3. Collect whitelisted selectors and consequential controls
         whitelisted_selectors, consequential_selectors = self._extract_selectors(
             assessment_map, journeys
         )
 
-        # 4. Attempt Gemini generation with at most 1 retry
-        attempts = 0
-        last_error: Exception | None = None
-        while attempts < 2:
-            attempts += 1
-            try:
+        # 4. Handle NVIDIA provider
+        if active_provider == LLMProvider.NVIDIA:
+            nvidia_key = get_nvidia_api_key(ctx.settings)
+            if not nvidia_key:
                 ctx.emit(
                     EventType.AGENT_PROGRESS,
                     AgentName.TESTER,
-                    f"Generating assessment test suite with Gemini ({self.model}, attempt {attempts}/2)...",
+                    "NVIDIA_API_KEY is not configured; using deterministic rule-based assessment test suite.",
                     level=EventLevel.INFO,
-                    data={"attempt": attempts, "model": self.model},
+                    data={"reason": "missing_api_key", "provider": "nvidia"},
                 )
+                return self._generate_assessment_fallback(ctx, assessment_map, journeys)
 
-                prompt = self._build_prompt(ctx.run.target_url, assessment_map, whitelisted_selectors)
-                raw_json = self._call_gemini(api_key, prompt)
-
-                test_cases = self._validate_and_build_cases(
-                    ctx=ctx,
-                    raw_json=raw_json,
-                    journeys=journeys,
-                    whitelisted_selectors=whitelisted_selectors,
-                    consequential_selectors=consequential_selectors,
-                )
-
-                if test_cases:
+            nvidia_model = self.model or get_nvidia_model(ctx.settings)
+            base_url = get_nvidia_base_url(ctx.settings)
+            attempts = 0
+            last_error: Exception | None = None
+            while attempts < 2:
+                attempts += 1
+                try:
                     ctx.emit(
                         EventType.AGENT_PROGRESS,
                         AgentName.TESTER,
-                        f"Gemini generated {len(test_cases)} valid assessment test case(s).",
+                        f"Generating assessment test suite with NVIDIA NIM ({nvidia_model}, attempt {attempts}/2)...",
                         level=EventLevel.INFO,
-                        data={"test_cases_count": len(test_cases), "source": "gemini"},
+                        data={"attempt": attempts, "model": nvidia_model, "provider": "nvidia"},
                     )
-                    return test_cases
-                else:
-                    raise ValueError("Gemini returned zero valid test cases after schema validation.")
 
-            except Exception as exc:
-                last_error = exc
-                logger.warning(f"Gemini suite generation attempt {attempts} failed: {exc}")
+                    prompt = self._build_prompt(ctx.run.target_url, assessment_map, whitelisted_selectors)
+                    raw_json = self._call_nvidia(nvidia_key, base_url, nvidia_model, prompt)
 
-        # 5. Recovery: Use deterministic fallback if both LLM attempts failed
+                    test_cases = self._validate_and_build_cases(
+                        ctx=ctx,
+                        raw_json=raw_json,
+                        journeys=journeys,
+                        whitelisted_selectors=whitelisted_selectors,
+                        consequential_selectors=consequential_selectors,
+                    )
+
+                    if test_cases:
+                        ctx.emit(
+                            EventType.AGENT_PROGRESS,
+                            AgentName.TESTER,
+                            f"NVIDIA generated {len(test_cases)} valid assessment test case(s).",
+                            level=EventLevel.INFO,
+                            data={"test_cases_count": len(test_cases), "source": "nvidia"},
+                        )
+                        return test_cases
+                    else:
+                        raise ValueError("NVIDIA returned zero valid test cases after schema validation.")
+
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(f"NVIDIA suite generation attempt {attempts} failed: {exc}")
+
+            ctx.emit(
+                EventType.AGENT_PROGRESS,
+                AgentName.TESTER,
+                f"NVIDIA test generation failed ({last_error}); activating deterministic assessment fallback.",
+                level=EventLevel.WARNING,
+                data={"error": str(last_error), "provider": "nvidia"},
+            )
+            return self._generate_assessment_fallback(ctx, assessment_map, journeys)
+
+        # 5. Handle Gemini provider
+        if active_provider == LLMProvider.GEMINI:
+            api_key = get_gemini_api_key(ctx.settings)
+            if not api_key:
+                ctx.emit(
+                    EventType.AGENT_PROGRESS,
+                    AgentName.TESTER,
+                    "GEMINI_API_KEY is not configured; using deterministic rule-based assessment test suite.",
+                    level=EventLevel.INFO,
+                    data={"reason": "missing_api_key", "provider": "gemini"},
+                )
+                return self._generate_assessment_fallback(ctx, assessment_map, journeys)
+
+            gemini_model = self.model or get_gemini_model()
+            attempts = 0
+            last_error = None
+            while attempts < 2:
+                attempts += 1
+                try:
+                    ctx.emit(
+                        EventType.AGENT_PROGRESS,
+                        AgentName.TESTER,
+                        f"Generating assessment test suite with Gemini ({gemini_model}, attempt {attempts}/2)...",
+                        level=EventLevel.INFO,
+                        data={"attempt": attempts, "model": gemini_model, "provider": "gemini"},
+                    )
+
+                    prompt = self._build_prompt(ctx.run.target_url, assessment_map, whitelisted_selectors)
+                    raw_json = self._call_gemini(api_key, gemini_model, prompt)
+
+                    test_cases = self._validate_and_build_cases(
+                        ctx=ctx,
+                        raw_json=raw_json,
+                        journeys=journeys,
+                        whitelisted_selectors=whitelisted_selectors,
+                        consequential_selectors=consequential_selectors,
+                    )
+
+                    if test_cases:
+                        ctx.emit(
+                            EventType.AGENT_PROGRESS,
+                            AgentName.TESTER,
+                            f"Gemini generated {len(test_cases)} valid assessment test case(s).",
+                            level=EventLevel.INFO,
+                            data={"test_cases_count": len(test_cases), "source": "gemini"},
+                        )
+                        return test_cases
+                    else:
+                        raise ValueError("Gemini returned zero valid test cases after schema validation.")
+
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(f"Gemini suite generation attempt {attempts} failed: {exc}")
+
+            ctx.emit(
+                EventType.AGENT_PROGRESS,
+                AgentName.TESTER,
+                f"Gemini test generation failed ({last_error}); activating deterministic assessment fallback.",
+                level=EventLevel.WARNING,
+                data={"error": str(last_error), "provider": "gemini"},
+            )
+            return self._generate_assessment_fallback(ctx, assessment_map, journeys)
+
+        # 6. Fallback if no provider / key
         ctx.emit(
             EventType.AGENT_PROGRESS,
             AgentName.TESTER,
-            f"Gemini test generation failed ({last_error}); activating deterministic assessment fallback.",
-            level=EventLevel.WARNING,
-            data={"error": str(last_error)},
+            "No LLM API key configured (NVIDIA_API_KEY or GEMINI_API_KEY); using deterministic rule-based assessment test suite.",
+            level=EventLevel.INFO,
+            data={"reason": "no_llm_key"},
         )
         return self._generate_assessment_fallback(ctx, assessment_map, journeys)
 
-    def _call_gemini(self, api_key: str, prompt: str) -> str:
+    def _call_nvidia(
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
+        prompt: str,
+    ) -> str:
+        """Call NVIDIA OpenAI-compatible API to generate structured test cases."""
+        import httpx
+
+        url = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        system_msg = (
+            "You are an assessment QA test-suite generator. You must return ONLY a JSON object "
+            "matching the schema with a 'cases' array of test cases, each with 'title', 'description', "
+            "'priority', 'steps' (index, action, selector, value, url, description), and 'expected_result'. "
+            "Do NOT wrap output in markdown code blocks. Output raw JSON only."
+        )
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 2048,
+            "response_format": {"type": "json_object"},
+        }
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            choices = data.get("choices", [])
+            if not choices:
+                raise ValueError("NVIDIA API returned no choices in response.")
+            content = choices[0].get("message", {}).get("content", "")
+            if not content:
+                raise ValueError("NVIDIA API returned empty message content.")
+            return content
+
+    def _call_gemini(self, api_key: str, model: str, prompt: str) -> str:
         """Execute request via Google GenAI client with JSON output configuration."""
         client = self._get_client(api_key)
         from google.genai import types
@@ -201,7 +356,7 @@ class SuiteGenerator:
         )
 
         response = client.models.generate_content(
-            model=self.model,
+            model=model,
             contents=prompt,
             config=config,
         )
@@ -341,8 +496,11 @@ STRICT REQUIREMENTS:
         whitelisted_selectors: set[str],
         consequential_selectors: set[str],
     ) -> list[TestCase]:
-        """Validate LLM output against schemas, bounds, and selector whitelists."""
-        data = json.loads(raw_json)
+        clean_json = raw_json.strip()
+        if clean_json.startswith("```"):
+            clean_json = re.sub(r"^```(?:json)?\s*", "", clean_json, flags=re.MULTILINE)
+            clean_json = re.sub(r"\s*```$", "", clean_json, flags=re.MULTILINE).strip()
+        data = json.loads(clean_json)
         suite = LLMTestSuite.model_validate(data)
 
         validated_cases: list[TestCase] = []

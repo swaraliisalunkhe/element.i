@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr = SecretStr("")
     google_api_key: SecretStr = SecretStr("")
     anthropic_api_key: SecretStr = SecretStr("")
+    nvidia_api_key: SecretStr = SecretStr("")
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_model: str = "meta/llama-3.1-70b-instruct"
 
     @property
     def resolved_gemini_api_key(self) -> str:
@@ -67,6 +70,32 @@ class Settings(BaseSettings):
             if val:
                 return val
         return ""
+
+    @property
+    def resolved_nvidia_api_key(self) -> str:
+        """Get cleaned NVIDIA API key from settings or environment without secrets."""
+        try:
+            val = self.nvidia_api_key.get_secret_value().strip().strip('"').strip("'")
+            if val:
+                return val
+        except Exception:
+            pass
+        import os
+        val = os.environ.get("NVIDIA_API_KEY", "").strip().strip('"').strip("'")
+        if val:
+            return val
+        return ""
+
+    @property
+    def resolved_llm_provider(self) -> LLMProvider:
+        """Auto-detect or return configured LLM provider."""
+        if self.llm_provider != LLMProvider.NONE:
+            return self.llm_provider
+        if self.resolved_nvidia_api_key:
+            return LLMProvider.NVIDIA
+        if self.resolved_gemini_api_key:
+            return LLMProvider.GEMINI
+        return LLMProvider.NONE
 
     # ---------- helpers ----------
 

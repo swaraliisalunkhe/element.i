@@ -57,3 +57,10 @@ def test_ensure_directories_creates_folders(tmp_path: Path):
     s.ensure_directories()
     assert (tmp_path / "d").is_dir()
     assert (tmp_path / "d" / "e").is_dir()
+
+
+def test_nvidia_api_key_resolution_and_provider_auto_detect(monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", '"nvapi-secret-key-123" ')
+    s = Settings(_env_file=None)
+    assert s.resolved_nvidia_api_key == "nvapi-secret-key-123"
+    assert s.resolved_llm_provider == LLMProvider.NVIDIA

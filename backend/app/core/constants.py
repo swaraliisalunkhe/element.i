@@ -185,6 +185,7 @@ class GenerationMode(StrEnum):
 
 class LLMProvider(StrEnum):
     GEMINI = "gemini"
+    NVIDIA = "nvidia"
     CLAUDE = "claude"
     NONE = "none"
 
