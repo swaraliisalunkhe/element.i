@@ -19,8 +19,7 @@ import pytest
 
 from app.core.config import get_settings
 from app.services.browser_driver import BrowserDriver, _sanitize_url, _validate_safe_filename
-
-DEPLOYED_SAMPLE_APP_URL = "https://qa-sample-app.onrender.com/"
+DEPLOYED_SAMPLE_APP_URL = "https://code-apex-sample-app-v2.onrender.com/"
 
 
 def _resolve_sample_app_url() -> str:
@@ -29,6 +28,13 @@ def _resolve_sample_app_url() -> str:
     url = getattr(settings, "sample_app_url", None)
     if not url or url == "http://localhost:5000":
         return DEPLOYED_SAMPLE_APP_URL
+    if url.startswith("http://localhost"):
+        try:
+            import urllib.request
+            urllib.request.urlopen(url, timeout=1)
+            return url
+        except Exception:
+            return DEPLOYED_SAMPLE_APP_URL
     return url
 
 

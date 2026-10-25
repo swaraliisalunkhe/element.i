@@ -3,12 +3,12 @@
     "id": "jny_7f8a9b0c1d2e",
     "run_id": "run_7f3a9c21b4d8",
     "name": "Explore Code Apex | Home and navigation flow",
-    "description": "Rule-based crawl traversing 2 reachable page(s) starting from https://qa-sample-app.onrender.com/.",
+    "description": "Rule-based crawl traversing 2 reachable page(s) starting from https://code-apex-sample-app-v2.onrender.com/.",
     "priority": 1,
-    "start_url": "https://qa-sample-app.onrender.com/",
+    "start_url": "https://code-apex-sample-app-v2.onrender.com/",
     "pages": [
       {
-        "url": "https://qa-sample-app.onrender.com/",
+        "url": "https://code-apex-sample-app-v2.onrender.com/",
         "title": "Code Apex | Home",
         "depth": 0,
         "elements": [
@@ -31,7 +31,7 @@
         ]
       },
       {
-        "url": "https://qa-sample-app.onrender.com/login",
+        "url": "https://code-apex-sample-app-v2.onrender.com/login",
         "title": "Code Apex | Login",
         "depth": 1,
         "elements": [

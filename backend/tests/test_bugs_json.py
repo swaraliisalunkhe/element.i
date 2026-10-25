@@ -22,6 +22,22 @@ TYPE_TO_CATEGORY = {
     "functionality": "functional",
     "data_integrity": "functional",
     "navigation": "navigation",
+    "calculation": "functional",
+    "idempotency": "functional",
+    "timer": "timer",
+    "evaluation": "evaluation",
+    "state": "answer_state",
+    "answer": "answer_state",
+    "scoring": "evaluation",
+    "submission": "functional",
+    "persistence": "functional",
+    "logic": "functional",
+    "ui": "ui_layout",
+    "editor": "functional",
+    "caching": "functional",
+    "cache": "functional",
+    "network": "network_error",
+    "console": "console_error",
 }
 
 

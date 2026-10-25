@@ -8,13 +8,13 @@
   "category": "functional",
   "description": "Automated test 'Verify page: Code Apex | Login' failed. Failed action was 'assert_visible' at step 3. Error message: Element 'button[type=\"submit\"]' is not visible. Observed outcome: Element 'button[type=\"submit\"]' is not visible.",
   "steps_to_reproduce": [
-    "Step 1: Open https://qa-sample-app.onrender.com/login",
+    "Step 1: Open https://code-apex-sample-app-v2.onrender.com/login",
     "Step 2: Assert URL contains '/login'",
     "Step 3: Verify visibility of button (button[type='submit'])"
   ],
-  "expected_behavior": "Page https://qa-sample-app.onrender.com/login loads with matching URL and visible controls.",
+  "expected_behavior": "Page https://code-apex-sample-app-v2.onrender.com/login loads with matching URL and visible controls.",
   "actual_behavior": "Element 'button[type=\"submit\"]' is not visible.",
-  "page_url": "https://qa-sample-app.onrender.com/login",
+  "page_url": "https://code-apex-sample-app-v2.onrender.com/login",
   "confidence": 0.85,
   "evidence": [
     {
